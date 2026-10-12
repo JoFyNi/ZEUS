@@ -1172,3 +1172,28 @@ welche `.env` gelesen wurde, ob die Vault existiert, ob Ollama läuft und ob die
 | Stimme klingt blechern | Es läuft noch pyttsx3. `/stimmen` zeigt es; `/stimme installieren` wechselt auf piper |
 | Mikrofon reagiert nicht | `pip install faster-whisper sounddevice`, Eingabegerät prüfen |
 | Umlaute im Terminal kaputt | Windows: `chcp 65001` vor dem Start |
+
+
+## License
+
+ZEUS is licensed under the **GNU General Public License v3.0 only (GPL-3.0-only)**. You may use, modify, and redistribute ZEUS under the terms of this license.
+
+See the [`LICENSE`](LICENSE) file for the full license text.
+
+### Third-party dependencies
+
+ZEUS uses third-party Python packages and software components, each of which is subject to its own license terms and copyright notices.
+
+See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for an overview of the project's direct dependencies and their licenses.
+
+### AI models and voice files
+
+AI models, model weights, embedding models, speech-recognition models, and text-to-speech voice files are **not included in this repository by default** and may need to be downloaded separately.
+
+These components are subject to their own license terms, which may differ from the license of ZEUS. Users are responsible for reviewing and complying with the applicable terms, particularly regarding commercial use and redistribution.
+
+See [`docs/MODEL_LICENSES.md`](docs/MODEL_LICENSES.md) for further information about the models and voice files used by ZEUS.
+
+### Disclaimer
+
+ZEUS is an independent project and is not affiliated with or endorsed by the authors or maintainers of third-party software, AI models, or voice files used with it, unless explicitly stated otherwise.
