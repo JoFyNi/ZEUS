@@ -1,0 +1,1891 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZEUS</title>
+<style>
+/* ===================================================================
+   Ein Entwicklungsboard, keine App fuer jedermann. Deshalb: alles
+   gleichzeitig sichtbar, Monospace, dichte Information, keine Reiter.
+   Reiter verstecken genau das, was man beim Entwickeln vergleichen
+   will - links was er sagt, rechts was er weiss.
+   =================================================================== */
+:root{
+  /* --- Flaechen: vier Ebenen, von tief nach hoch ------------------- */
+  --tief:#06080c; --grund:#0a0d13; --flaeche:#0f131b; --hoch:#151b26;
+
+  /* --- Linien -------------------------------------------------------
+     --linie ist Zierrat (Trenner, Panelkanten) und darf schwach sein.
+     --linie-ui ist die EINZIGE Begrenzung anklickbarer Knoepfe und
+     erreicht deshalb 3:1 gegen den Untergrund (WCAG 1.4.11). Vorher
+     trugen Chips und Kopfknoepfe --linie mit 1,33:1 - fuer ein Auge,
+     das nicht auf einem guten Schirm sitzt, waren sie randlos. */
+  --linie:#1e2735; --linie-hell:#2c3850; --linie-ui:#4b6386;
+
+  /* --- Schrift: drei Stufen, jede AA-tauglich -----------------------
+     --text-schwach stand auf #556075 und traf gegen --hoch nur 2,73:1.
+     Genau dieser Ton trug die 9,5px-Beschriftungen, also die kleinste
+     Schrift der Oberflaeche in der schlechtesten Farbe. Die Rampe ist
+     jetzt durchgehend >= 4,7:1 und die Stufen bleiben unterscheidbar
+     (1,77 zwischen text und matt, 1,54 zwischen matt und schwach). */
+  --text:#d7e0ee; --text-matt:#a1a9ba; --text-schwach:#7a879e;
+
+  --eis:#5fd3f5; --eis-tief:#1b6f8c; --eis-glut:rgba(95,211,245,.13);
+  --gruen:#57d9a3; --bernstein:#e8b04b; --rot:#e8685d; --lila:#a98bff;
+
+  /* --- Bewegung ------------------------------------------------------ */
+  --schnell:.14s cubic-bezier(.4,0,.2,1);
+  --weich:.3s cubic-bezier(.22,1,.36,1);
+
+  --mono:"JetBrains Mono","Cascadia Mono","SF Mono",Consolas,ui-monospace,monospace;
+  --kopf:46px;
+
+  /* --- Schriftgrade --------------------------------------------------
+     Vorher lagen elf Grade zwischen 9 und 16px, in Halb-Pixel-Schritten
+     (9,5 / 10 / 10,5 / 11 / 11,5 ...). Ein halber Pixel ist keine
+     Hierarchie, er ist Rauschen. Sechs Stufen, kleinste 10px. */
+  --t-xs:10px; --t-s:11px; --t-m:12px; --t-l:13px; --t-xl:14px; --t-2xl:16px;
+
+  /* --- Radien: drei statt sieben (2/3/4/5/6/8/19px) ------------------ */
+  --r-s:4px; --r-m:8px; --r-voll:999px;
+
+  /* --- Ebenen: benannt statt geraten --------------------------------- */
+  --e-graph:8; --e-schwebe:14; --e-log:18; --e-blende:20;
+  --e-lade:28; --e-griff:29; --e-kopf:30; --e-magie:40;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--tief); color:var(--text); font-family:var(--mono);
+  font-size:var(--t-l); line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--linie);border-radius:var(--r-m)}
+::-webkit-scrollbar-thumb:hover{background:var(--linie-hell)}
+button{font-family:var(--mono);cursor:pointer}
+
+/* ------------------------------------------------- Tastaturbedienung
+   Vier Elemente trugen outline:none, darunter #feld - das Hauptfeld der
+   Oberflaeche. Es hatte ueberhaupt keine :focus-Regel. Wer mit Tab
+   navigierte, sah nicht, wo er stand. :focus-visible zeigt den Ring nur
+   der Tastatur, der Mausklick bleibt so ruhig wie vorher. */
+:focus-visible{
+  outline:2px solid var(--eis); outline-offset:2px;
+  border-radius:var(--r-s);
+}
+#feld:focus-visible{outline-offset:-2px}
+#hirn-leinwand:focus-visible,#lade-leinwand:focus-visible{outline-offset:-3px}
+
+/* ------------------------------------------------------- Bewegung aus
+   Der Kopf atmet, die Ringe pulsen, die Punkte huepfen - alles endlos.
+   Fuer jemanden mit Bewegungsempfindlichkeit ist eine Dauerschleife am
+   Bildschirmrand kein Detail. Der ARBEITET-Zustand bleibt sichtbar, er
+   wird nur von Bewegung auf Farbe umgestellt: Wer nicht animieren will,
+   soll trotzdem erkennen, dass gerade gerechnet wird. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important; animation-iteration-count:1!important;
+    transition-duration:.01ms!important; scroll-behavior:auto!important;
+  }
+  body.arbeitet #gehirn .ring{display:none}
+  body.arbeitet #gehirn .kern{stroke:var(--eis)}
+  body.arbeitet #gehirn .funke{fill:var(--eis);opacity:1}
+  body.arbeitet #gehirn svg{filter:drop-shadow(0 0 6px rgba(95,211,245,.8))}
+  .punkte i{opacity:.8}
+  .zeile{animation:none}
+}
+
+/* ======================================================= Kopfzeile */
+#kopf{
+  height:var(--kopf); display:flex; align-items:center; gap:14px;
+  padding:0 12px; background:var(--grund); border-bottom:1px solid var(--linie);
+  position:relative; z-index:var(--e-kopf);
+}
+#gehirn{width:26px;height:26px;flex:0 0 26px}
+#gehirn svg{width:100%;height:100%;overflow:visible}
+#gehirn .kern{fill:none;stroke:var(--text-schwach);stroke-width:1.3;transition:stroke .4s}
+#gehirn .funke{fill:var(--text-schwach);transition:fill .4s}
+#gehirn .ring{fill:none;stroke:var(--eis);stroke-width:1;opacity:0}
+body.arbeitet #gehirn .kern{stroke:var(--eis)}
+body.arbeitet #gehirn .funke{fill:var(--eis);animation:atmen 1.5s ease-in-out infinite}
+body.arbeitet #gehirn svg{filter:drop-shadow(0 0 6px rgba(95,211,245,.8))}
+body.arbeitet #gehirn .ring{animation:welle 2.1s ease-out infinite}
+body.arbeitet #gehirn .ring:nth-of-type(2){animation-delay:.7s}
+body.arbeitet #gehirn .funke:nth-of-type(3n){animation-delay:.25s}
+body.arbeitet #gehirn .funke:nth-of-type(3n+1){animation-delay:.55s}
+@keyframes welle{0%{opacity:.55;transform:scale(.55)}100%{opacity:0;transform:scale(1.5)}}
+@keyframes atmen{0%,100%{opacity:.35}50%{opacity:1}}
+#name{font-size:var(--t-2xl);font-weight:700;letter-spacing:.3em;color:var(--text);
+  text-shadow:0 0 18px rgba(95,211,245,.3)}
+#zustand{font-size:var(--t-s);color:var(--text-schwach);letter-spacing:.08em;min-width:78px}
+#kopf .luecke{flex:1}
+.chip{
+  font-size:var(--t-s);padding:3px 9px;border-radius:var(--r-s);border:1px solid var(--linie-ui);
+  color:var(--text-matt);white-space:nowrap;background:var(--flaeche);
+  transition:all var(--schnell);
+}
+.chip:hover{border-color:var(--linie-hell);color:var(--text)}
+.chip.warn{border-color:rgba(232,176,75,.4);color:var(--bernstein)}
+.chip.gefahr{border-color:rgba(232,104,93,.45);color:var(--rot)}
+.kopfknopf{
+  background:var(--flaeche);border:1px solid var(--linie-ui);color:var(--text-matt);
+  width:30px;height:26px;border-radius:var(--r-s);display:flex;align-items:center;
+  justify-content:center;transition:all var(--schnell);
+}
+.kopfknopf:hover{border-color:var(--eis-tief);color:var(--eis)}
+.kopfknopf svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6}
+
+/* =========================== Die Lade: halbdurchsichtiger Ziehgriff */
+/* Der Griff sitzt LINKS, nicht mittig: mittig lag er ueber der
+   Werkzeugleiste des Graphen und verdeckte das Suchfeld. */
+#lade-griff{
+  position:absolute; top:var(--kopf); left:14px;
+  z-index:var(--e-griff); height:17px; padding:0 26px; border:1px solid var(--linie);
+  border-top:none; border-radius:0 0 var(--r-m) var(--r-m); background:rgba(15,19,27,.55);
+  color:var(--text-schwach); font-size:var(--t-xs); letter-spacing:.2em;
+  display:flex; align-items:center; gap:8px; opacity:.34;
+  transition:opacity var(--schnell),background var(--schnell),color var(--schnell);
+  backdrop-filter:blur(6px);
+}
+#lade-griff:hover{opacity:1;background:var(--hoch);color:var(--eis);
+  border-color:var(--eis-tief)}
+#lade-griff .pfeil{transition:transform var(--weich);display:inline-block}
+/* Aufgeklappt rutscht der Griff an die UNTERKANTE der Lade - oben lag er
+   sonst ueber dem Filterfeld. 200px = max-height von #lade. */
+body.lade-auf #lade-griff{opacity:1;color:var(--eis);border-color:var(--eis-tief);
+  top:calc(var(--kopf) + 302px);background:var(--hoch)}
+body.lade-auf #lade-griff .pfeil{transform:rotate(180deg)}
+
+#lade{
+  position:absolute; top:var(--kopf); left:0; right:0; z-index:var(--e-lade);
+  background:var(--grund); border-bottom:1px solid var(--linie);
+  max-height:0; overflow:hidden; transition:max-height var(--weich);
+  box-shadow:0 14px 30px rgba(0,0,0,.5);
+}
+body.lade-auf #lade{max-height:302px}
+#lade-kopf{
+  display:flex;align-items:center;gap:10px;padding:8px 12px 0;
+  font-size:var(--t-xs);letter-spacing:.14em;color:var(--text-schwach);
+}
+#lade-kopf input{
+  background:var(--tief);border:1px solid var(--linie-ui);border-radius:var(--r-s);
+  padding:4px 9px;color:var(--text);font-family:var(--mono);font-size:var(--t-s);
+  outline:none;width:180px;transition:all var(--schnell);
+}
+#lade-kopf input:focus{border-color:var(--eis-tief);width:240px}
+#lade-kopf .filter{
+  background:none;border:1px solid var(--linie-ui);border-radius:var(--r-s);padding:3px 8px;
+  color:var(--text-schwach);font-size:var(--t-xs);transition:all var(--schnell);
+}
+#lade-kopf .filter:hover{color:var(--text);border-color:var(--linie-hell)}
+#lade-kopf .filter.an{color:var(--eis);border-color:var(--eis-tief);
+  background:var(--eis-glut)}
+/* Das Sternenband. Eine waagerechte Leinwand statt einer Kartenreihe -
+   die Sternbilder aus der ersten Fassung, nur in den Schieber gelegt.
+   Das Mausrad schiebt hier seitwaerts; senkrecht gibt es nichts zu scrollen. */
+#lade-band{position:relative;height:262px}
+#lade-leinwand{display:block;width:100%;height:100%;cursor:grab}
+#lade-leinwand.zieht{cursor:grabbing}
+/* Der schmale Balken darunter zeigt, wo im Band man gerade ist. */
+#lade-balken{position:absolute;left:12px;right:12px;bottom:4px;height:4px;
+  background:var(--linie);border-radius:var(--r-s);overflow:hidden}
+#lade-balken i{display:block;height:100%;background:var(--eis-tief);border-radius:var(--r-s);
+  transition:none}
+/* Die Karte darf das Band nicht sprengen - #lade schneidet ab, und dann
+   fehlte die Haelfte der Schrittliste. Beschreibung auf zwei Zeilen. */
+#lade-schwebe{position:absolute;z-index:var(--e-schwebe);pointer-events:none;max-width:330px;
+  max-height:244px;overflow:hidden;
+  background:rgba(6,8,12,.98);border:1px solid var(--linie-hell);border-radius:var(--r-m);
+  padding:11px 13px;opacity:0;transform:translateY(4px);
+  transition:opacity .12s,transform .12s;box-shadow:0 12px 38px rgba(0,0,0,.72)}
+#lade-schwebe.da{opacity:1;transform:none}
+#lade-schwebe .k{font-size:var(--t-l);color:var(--eis);margin-bottom:2px}
+#lade-schwebe .u{font-size:var(--t-xs);color:var(--text-schwach);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:8px}
+#lade-schwebe .b{font-size:var(--t-s);color:var(--text-matt);line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#lade-schwebe dl{display:grid;grid-template-columns:auto 1fr;gap:1px 11px;
+  font-size:var(--t-xs);margin-top:7px;padding-top:6px;border-top:1px solid var(--linie)}
+#lade-schwebe dt{color:var(--text-schwach)} #lade-schwebe dd{color:var(--text)}
+/* Die Rangleiste wie die Perkpunkte im Spiel. */
+.raenge{display:flex;gap:3px;margin-top:8px}
+.raenge i{width:15px;height:3px;border-radius:var(--r-s);background:var(--linie)}
+.raenge i.voll{background:var(--eis);box-shadow:0 0 7px var(--eis)}
+#lade-schwebe .schritte{margin-top:7px;padding-top:6px;
+  border-top:1px solid var(--linie);display:flex;flex-direction:column;gap:2px}
+#lade-schwebe .sr{font-size:var(--t-xs);color:var(--text-schwach);display:flex;gap:7px}
+#lade-schwebe .sr b{color:var(--linie-hell);font-weight:600;min-width:11px}
+#lade-schwebe .sr.an{color:var(--eis)} #lade-schwebe .sr.an b{color:var(--eis)}
+
+/* ================================= Das Board: links Chat, rechts Hirn */
+#board{display:flex;height:calc(100% - var(--kopf));position:relative}
+#links{display:flex;flex-direction:column;min-width:340px;width:52%;
+  background:var(--tief)}
+#griff{
+  flex:0 0 5px;cursor:col-resize;background:var(--linie);position:relative;
+  transition:background var(--schnell);
+}
+#griff:hover,#griff.zieht{background:var(--eis-tief)}
+#rechts{flex:1;min-width:300px;position:relative;background:var(--tief);
+  border-left:1px solid var(--linie);overflow:hidden}
+
+/* ------------------------------------------------- Terminal-Chat links */
+#verlauf{flex:1;overflow-y:auto;padding:12px 14px 6px;font-size:var(--t-l)}
+.zeile{margin-bottom:11px;animation:auf .22s ease}
+@keyframes auf{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.zeile .marke{
+  font-size:var(--t-xs);letter-spacing:.12em;color:var(--text-schwach);
+  display:flex;align-items:baseline;gap:8px;margin-bottom:3px;
+}
+.zeile.ich .marke{color:var(--lila)}
+.zeile.er .marke{color:var(--eis)}
+.zeile.sys .marke{color:var(--bernstein)}
+.zeile .zeit{margin-left:auto;font-size:var(--t-xs);color:var(--text-schwach);opacity:.65}
+.rumpf{padding-left:12px;border-left:1px solid var(--linie);
+  transition:border-color var(--schnell)}
+.zeile.ich .rumpf{border-left-color:rgba(169,139,255,.4);color:#fff;
+  white-space:pre-wrap;word-break:break-word}
+.zeile.er .rumpf:hover{border-left-color:var(--eis-tief)}
+.rumpf p{margin:0 0 7px}.rumpf p:last-child{margin-bottom:0}
+.rumpf h1,.rumpf h2,.rumpf h3,.rumpf h4{font-size:var(--t-l);color:var(--eis);
+  margin:12px 0 5px;font-weight:600;letter-spacing:.02em}
+.rumpf h1:first-child,.rumpf h2:first-child,.rumpf h3:first-child{margin-top:0}
+.rumpf ul,.rumpf ol{margin:0 0 7px 17px}
+.rumpf li{margin-bottom:2px}
+.rumpf code{background:var(--hoch);padding:1px 4px;border-radius:var(--r-s);color:var(--eis)}
+.rumpf pre{background:#05070a;border:1px solid var(--linie);border-radius:var(--r-s);
+  padding:9px 11px;overflow-x:auto;margin:0 0 8px;font-size:var(--t-m);line-height:1.45}
+.rumpf pre code{background:none;padding:0;color:var(--text)}
+/* Eine Zeichnung aus struktur_zeichnen. Sie soll atmen duerfen -
+   ein Ablaufbild in Zeilenbreite gequetscht ist unlesbar. */
+.zeichnung{margin:.7rem 0;padding:.5rem;background:var(--flaeche);
+  border:1px solid var(--linie);border-radius:var(--r-s);overflow-x:auto}
+.zeichnung svg{display:block;max-width:100%;height:auto}
+.rumpf strong{color:#fff}
+.rumpf em{color:var(--text-matt)}
+.rumpf table{border-collapse:collapse;margin:0 0 8px;font-size:var(--t-m);width:100%}
+.rumpf th,.rumpf td{border:1px solid var(--linie);padding:3px 7px;text-align:left}
+.rumpf th{background:var(--hoch);color:var(--eis)}
+.rumpf a.wiki{color:var(--eis);cursor:pointer;border-bottom:1px dotted var(--eis-tief);
+  text-decoration:none}
+.rumpf a.wiki:hover{background:var(--eis-glut)}
+/* Befehlsausgabe kommt fertig gesetzt aus dem Terminal - unveraendert zeigen */
+.konsole{background:#05070a;border:1px solid var(--linie);border-radius:var(--r-s);
+  padding:9px 11px;overflow-x:auto;font-size:var(--t-m);line-height:1.42;
+  white-space:pre;color:var(--text-matt)}
+
+.werkzeuge{margin-top:7px;border-left:1px solid var(--linie);padding-left:11px}
+.wz{display:flex;gap:8px;font-size:var(--t-s);padding:2px 0;animation:auf .2s ease}
+.wz .z{flex:0 0 auto}
+.wz.ok .z{color:var(--gruen)} .wz.fehler .z{color:var(--rot)}
+.wz b{color:var(--text);font-weight:600}
+.wz .was{color:var(--text-schwach);word-break:break-word}
+.quellen{margin-top:7px;display:flex;flex-wrap:wrap;gap:5px}
+.quelle{font-size:var(--t-xs);padding:2px 7px;border-radius:var(--r-s);border:1px solid var(--linie-ui);
+  color:var(--text-matt);cursor:pointer;transition:all var(--schnell)}
+.quelle:hover{border-color:var(--eis-tief);color:var(--eis);background:var(--eis-glut)}
+.punkte{display:inline-flex;gap:4px;padding:3px 0}
+.punkte i{width:4px;height:4px;border-radius:50%;background:var(--eis);
+  animation:huepf 1.3s ease-in-out infinite}
+.punkte i:nth-child(2){animation-delay:.18s}
+.punkte i:nth-child(3){animation-delay:.36s}
+@keyframes huepf{0%,60%,100%{opacity:.22;transform:translateY(0)}
+  30%{opacity:1;transform:translateY(-3px)}}
+
+/* ------------------------------------------------------- Eingabezeile */
+#eingabe{border-top:1px solid var(--linie);background:var(--grund);padding:8px 10px;
+  position:relative}
+#kasten{display:flex;gap:8px;align-items:flex-end}
+#zeiger{color:var(--eis);font-size:var(--t-l);padding:5px 0 0;user-select:none}
+#feld{
+  flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:var(--t-l);resize:none;max-height:190px;
+  line-height:1.5;padding:4px 0;
+}
+#feld::placeholder{color:var(--text-schwach)}
+#senden{width:28px;height:28px;flex:0 0 28px;border-radius:var(--r-s);border:none;
+  background:var(--eis-tief);color:#04141b;display:flex;align-items:center;
+  justify-content:center;transition:all var(--schnell)}
+#senden:hover:not(:disabled){background:var(--eis)}
+#senden:disabled{opacity:.3;cursor:not-allowed}
+#senden svg{width:14px;height:14px;fill:currentColor}
+#fusszeile{display:flex;gap:13px;margin-top:5px;font-size:var(--t-xs);
+  color:var(--text-schwach);flex-wrap:wrap}
+#fusszeile b{color:var(--text-matt);font-weight:600}
+
+/* ------------------------------- Magic: die Vorschlagsliste ueber dem Feld */
+#magie{
+  position:absolute; bottom:calc(100% + 6px); left:10px; right:10px;
+  background:rgba(10,13,19,.985); border:1px solid var(--linie-hell);
+  border-radius:var(--r-m); box-shadow:0 -12px 40px rgba(0,0,0,.66); overflow:hidden;
+  display:none; z-index:var(--e-magie); backdrop-filter:blur(10px);
+}
+#magie.da{display:block}
+#magie-kopf{
+  padding:6px 11px;font-size:var(--t-xs);letter-spacing:.14em;color:var(--text-schwach);
+  border-bottom:1px solid var(--linie);display:flex;gap:10px;align-items:center;
+}
+#magie-liste{max-height:258px;overflow-y:auto}
+.mv{
+  display:flex;gap:10px;align-items:baseline;padding:6px 11px;cursor:pointer;
+  border-left:2px solid transparent;
+}
+.mv:hover{background:var(--flaeche)}
+.mv.gewaehlt{background:var(--eis-glut);border-left-color:var(--eis)}
+.mv .mn{color:var(--text);font-size:var(--t-m);flex:0 0 auto}
+.mv.gewaehlt .mn{color:var(--eis)}
+.mv .mh{font-size:var(--t-xs);padding:1px 5px;border-radius:var(--r-s);border:1px solid var(--linie);
+  color:var(--text-schwach);flex:0 0 auto}
+.mv .mk{font-size:var(--t-s);color:var(--text-schwach);flex:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.mv .mz{font-size:var(--t-xs);color:var(--text-schwach);opacity:.7}
+
+/* ================================================= Rechts: das Hirn */
+#hirn-kopf{
+  position:absolute;top:9px;left:9px;right:9px;z-index:var(--e-graph);display:flex;gap:7px;
+  align-items:center;flex-wrap:wrap;pointer-events:none;
+}
+#hirn-kopf>*{pointer-events:auto}
+.hknopf{
+  background:rgba(15,19,27,.92);border:1px solid var(--linie-ui);border-radius:var(--r-s);
+  padding:5px 9px;color:var(--text-schwach);font-size:var(--t-s);
+  backdrop-filter:blur(8px);transition:all var(--schnell);white-space:nowrap;
+}
+.hknopf:hover{border-color:var(--eis-tief);color:var(--eis)}
+.hknopf.an{border-color:var(--eis-tief);color:var(--eis);background:var(--eis-glut)}
+#hirn-suche{
+  background:rgba(15,19,27,.92);border:1px solid var(--linie-ui);border-radius:var(--r-s);
+  padding:5px 9px;color:var(--text);font-family:var(--mono);font-size:var(--t-s);
+  outline:none;width:150px;backdrop-filter:blur(8px);transition:all var(--schnell);
+}
+#hirn-suche:focus{border-color:var(--eis-tief);width:210px}
+#hirn-info{margin-left:auto;font-size:var(--t-xs);color:var(--text-schwach);
+  background:rgba(6,8,12,.85);padding:4px 8px;border-radius:var(--r-s);backdrop-filter:blur(8px)}
+#hirn-leinwand{display:block;width:100%;height:100%;cursor:grab}
+#hirn-leinwand.zieht{cursor:grabbing}
+.schwebe{
+  position:absolute;z-index:var(--e-schwebe);pointer-events:none;max-width:310px;
+  background:rgba(6,8,12,.97);border:1px solid var(--linie-hell);border-radius:var(--r-m);
+  padding:10px 12px;opacity:0;transform:translateY(4px);
+  transition:opacity .12s,transform .12s;box-shadow:0 12px 38px rgba(0,0,0,.7);
+}
+.schwebe.da{opacity:1;transform:none}
+.schwebe .k{font-size:var(--t-m);color:var(--eis);margin-bottom:2px;word-break:break-word}
+.schwebe .u{font-size:var(--t-xs);color:var(--text-schwach);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:7px}
+.schwebe dl{display:grid;grid-template-columns:auto 1fr;gap:2px 11px;font-size:var(--t-s)}
+.schwebe dt{color:var(--text-schwach)} .schwebe dd{color:var(--text)}
+
+/* ------------------------------------------- Slide-in fuer Notiz/Settings */
+.blende{
+  position:absolute;top:0;right:0;bottom:0;width:min(460px,74%);
+  background:var(--grund);border-left:1px solid var(--linie);z-index:var(--e-blende);
+  transform:translateX(101%);transition:transform var(--weich);
+  display:flex;flex-direction:column;box-shadow:-20px 0 44px rgba(0,0,0,.55);
+}
+.blende.auf{transform:none}
+.blende-kopf{padding:11px 13px;border-bottom:1px solid var(--linie);
+  display:flex;align-items:flex-start;gap:9px}
+.blende-kopf h3{font-size:var(--t-l);color:var(--eis);font-weight:600;flex:1;
+  word-break:break-word;line-height:1.35}
+.blende-kopf .pfad{font-size:var(--t-xs);color:var(--text-schwach);margin-top:2px;
+  word-break:break-all}
+.zu{background:none;border:1px solid var(--linie-ui);color:var(--text-schwach);
+  width:24px;height:24px;flex:0 0 24px;border-radius:var(--r-s);font-size:var(--t-xl);line-height:1;
+  transition:all var(--schnell)}
+.zu:hover{border-color:var(--rot);color:var(--rot)}
+.blende-rumpf{flex:1;overflow-y:auto;padding:12px 13px;font-size:var(--t-m);
+  white-space:pre-wrap;word-break:break-word;color:var(--text-matt);line-height:1.6}
+.blende-fuss{padding:9px 13px;border-top:1px solid var(--linie);display:flex;gap:7px}
+.tat{flex:1;padding:7px;border-radius:var(--r-s);border:1px solid var(--eis-tief);
+  background:var(--eis-glut);color:var(--eis);font-size:var(--t-s);
+  transition:all var(--schnell)}
+.tat:hover{background:var(--eis-tief);color:#04141b}
+.tat.matt{border-color:var(--linie);background:transparent;color:var(--text-matt)}
+.tat.matt:hover{border-color:var(--linie-hell);color:var(--text)}
+
+/* ================================================= Das Protokollfenster
+   Rechts, ausklappbar ODER anheftbar. Angeheftet schiebt es das Hirn
+   zusammen statt es zu verdecken - beim Arbeiten will man beides sehen. */
+#log{
+  position:absolute;top:0;right:0;bottom:0;width:min(430px,72%);z-index:var(--e-log);
+  background:var(--grund);border-left:1px solid var(--linie);
+  display:flex;flex-direction:column;transform:translateX(101%);
+  transition:transform var(--weich);box-shadow:-20px 0 44px rgba(0,0,0,.5);
+}
+#log.auf{transform:none}
+body.log-fest #rechts{padding-right:min(430px,72%)}
+body.log-fest #log{box-shadow:none;border-left:1px solid var(--linie-hell)}
+#log-kopf{padding:9px 11px;border-bottom:1px solid var(--linie);
+  display:flex;align-items:center;gap:8px}
+#log-kopf h3{font-size:var(--t-m);color:var(--eis);font-weight:600;letter-spacing:.1em}
+#log-kopf .zahl{font-size:var(--t-xs);color:var(--text-schwach);margin-left:auto}
+#log-filter{display:flex;gap:4px;padding:7px 11px;border-bottom:1px solid var(--linie);
+  flex-wrap:wrap}
+#log-filter button{background:none;border:1px solid var(--linie-ui);border-radius:var(--r-s);
+  padding:2px 7px;color:var(--text-schwach);font-size:var(--t-xs);
+  transition:all var(--schnell)}
+#log-filter button:hover{color:var(--text);border-color:var(--linie-hell)}
+#log-filter button.an{color:var(--eis);border-color:var(--eis-tief);
+  background:var(--eis-glut)}
+#log-filter button .n{opacity:.6;margin-left:4px}
+#log-zeilen{flex:1;overflow-y:auto;padding:6px 0;font-size:var(--t-s);line-height:1.5;
+  background:#05070a}
+.lz{display:flex;gap:8px;padding:2px 11px;white-space:pre-wrap;word-break:break-word;
+  border-left:2px solid transparent}
+.lz:hover{background:var(--flaeche)}
+.lz .t{color:var(--text-schwach);flex:0 0 auto;opacity:.7}
+.lz .z{flex:0 0 auto}
+.lz .q{color:var(--text-schwach);flex:0 0 auto}
+.lz .m{flex:1}
+.lz .d{color:var(--text-schwach);opacity:.75;font-size:var(--t-xs)}
+/* Farben wie in deinem Entwurf - ein Ton je Ebene, sonst nichts. */
+.lz.info{color:var(--text-matt)}
+.lz.erfolg{color:var(--gruen);border-left-color:rgba(87,217,163,.35)}
+.lz.warnung{color:var(--bernstein);border-left-color:rgba(232,176,75,.4)}
+.lz.fehler{color:var(--rot);border-left-color:rgba(232,104,93,.5);
+  background:rgba(232,104,93,.05)}
+.lz.aenderung{color:var(--lila);border-left-color:rgba(169,139,255,.4)}
+.lz.netz_raus{color:#569cd6;border-left-color:rgba(86,156,214,.4)}
+.lz.netz_rein{color:#4ec9b0;border-left-color:rgba(78,201,176,.4)}
+#log-fuss{padding:7px 11px;border-top:1px solid var(--linie);display:flex;
+  align-items:center;gap:8px;font-size:var(--t-xs);color:var(--text-schwach)}
+#log-fuss .pfad{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#log-fuss button{background:none;border:1px solid var(--linie-ui);border-radius:var(--r-s);
+  padding:3px 8px;color:var(--text-schwach);font-size:var(--t-xs);
+  transition:all var(--schnell)}
+#log-fuss button:hover{color:var(--text);border-color:var(--linie-hell)}
+#log-fuss button.an{color:var(--eis);border-color:var(--eis-tief)}
+
+/* Einstellungen liegen in derselben Blende, nur breiter */
+#einst-blende{width:min(620px,90%)}
+#einst-rumpf{flex:1;overflow-y:auto;padding:12px 13px 6px}
+.gruppe{margin-bottom:9px;border:1px solid var(--linie);border-radius:var(--r-m);
+  overflow:hidden;background:var(--flaeche)}
+.gruppe>summary{padding:9px 12px;cursor:pointer;font-size:var(--t-s);letter-spacing:.13em;
+  text-transform:uppercase;color:var(--eis);background:var(--hoch);list-style:none;
+  display:flex;align-items:center;gap:9px;transition:background var(--schnell)}
+.gruppe>summary::-webkit-details-marker{display:none}
+.gruppe>summary::before{content:"▸";transition:transform var(--schnell);
+  display:inline-block;color:var(--text-schwach)}
+.gruppe[open]>summary::before{transform:rotate(90deg)}
+.gruppe>summary:hover{background:var(--linie)}
+.feld{padding:10px 12px;border-top:1px solid var(--linie)}
+.feld h4{font-size:var(--t-m);font-weight:600;display:flex;align-items:baseline;gap:8px;
+  flex-wrap:wrap}
+.feld h4 .schl{font-size:var(--t-xs);color:var(--text-schwach);font-weight:400}
+.feld p{font-size:var(--t-s);color:var(--text-matt);margin:4px 0 7px;line-height:1.5}
+.feld .neustart{font-size:var(--t-xs);padding:1px 6px;border-radius:var(--r-s);
+  border:1px solid rgba(232,176,75,.35);color:var(--bernstein)}
+.feld input[type=text],.feld input[type=number],.feld select{
+  width:100%;background:var(--tief);border:1px solid var(--linie-ui);border-radius:var(--r-s);
+  padding:6px 9px;color:var(--text);font-family:var(--mono);font-size:var(--t-m);
+  outline:none;transition:all var(--schnell)}
+.feld input:focus,.feld select:focus{border-color:var(--eis-tief)}
+.feld input.geaendert{border-color:var(--bernstein)}
+.schalter{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
+.schalter input{display:none}
+.schalter .bahn{width:36px;height:19px;border-radius:var(--r-voll);background:var(--tief);
+  border:1px solid var(--linie-ui);position:relative;transition:all var(--schnell);
+  flex:0 0 36px}
+.schalter .bahn::after{content:"";position:absolute;top:2px;left:2px;width:13px;
+  height:13px;border-radius:50%;background:var(--text-schwach);
+  transition:all var(--weich)}
+.schalter input:checked+.bahn{background:var(--eis-glut);border-color:var(--eis-tief)}
+.schalter input:checked+.bahn::after{transform:translateX(17px);background:var(--eis)}
+.schalter .wort{font-size:var(--t-s);color:var(--text-matt)}
+.meldung{padding:8px 11px;border-radius:var(--r-s);margin-bottom:9px;font-size:var(--t-s)}
+.meldung.gut{border:1px solid rgba(87,217,163,.3);background:rgba(87,217,163,.07);
+  color:var(--gruen)}
+.meldung.schlecht{border:1px solid rgba(232,104,93,.3);background:rgba(232,104,93,.07);
+  color:var(--rot)}
+
+@media (max-width:900px){
+  #board{flex-direction:column}
+  #links{width:100%!important;height:58%}
+  #rechts{border-left:none;border-top:1px solid var(--linie)}
+  #griff{display:none}
+}
+</style>
+</head>
+<body>
+
+<header id="kopf">
+  <div id="gehirn" title="Leuchtet, solange er arbeitet">
+    <svg viewBox="0 0 40 40">
+      <circle class="ring" cx="20" cy="20" r="15"/>
+      <circle class="ring" cx="20" cy="20" r="15"/>
+      <path class="kern" d="M20 8v24M20 8c-4-4-11-2-11 4 0 2 1 3 2 4-2 1-3 3-3 5 0 4 3 6 6 6 1 3 4 5 6 5"/>
+      <path class="kern" d="M20 8c4-4 11-2 11 4 0 2-1 3-2 4 2 1 3 3 3 5 0 4-3 6-6 6-1 3-4 5-6 5"/>
+      <path class="kern" d="M14 14c2 1 4 2 6 2M14 22c2-1 4-1 6-1M26 14c-2 1-4 2-6 2M26 22c-2-1-4-1-6-1"/>
+      <circle class="funke" cx="14" cy="14" r="1.7"/><circle class="funke" cx="14" cy="22" r="1.7"/>
+      <circle class="funke" cx="26" cy="14" r="1.7"/><circle class="funke" cx="26" cy="22" r="1.7"/>
+      <circle class="funke" cx="20" cy="16" r="1.7"/><circle class="funke" cx="20" cy="27" r="1.7"/>
+    </svg>
+  </div>
+  <div id="name">ZEUS</div>
+  <div id="zustand">bereit</div>
+  <div class="luecke"></div>
+  <div class="chip" id="chip-modell" title="Modell">–</div>
+  <div class="chip" id="chip-host" title="Server">–</div>
+  <div class="chip" id="chip-vault" title="Vault">–</div>
+  <div class="chip gefahr" id="chip-trocken" style="display:none">TROCKENLAUF</div>
+  <button class="kopfknopf" id="knopf-leeren" title="Ausgabe leeren (Verlauf bleibt)">
+    <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="kopfknopf" id="knopf-log" title="Protokoll (Strg+L)">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5" stroke-linecap="round"/></svg>
+  </button>
+  <button class="kopfknopf" id="knopf-einst" title="Einstellungen (.env)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7.9 19l-.1.1A2 2 0 1 1 5 16.3l.1-.1A1.7 1.7 0 0 0 3.8 13.3H3.7a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 5 6.4L4.9 6.3A2 2 0 1 1 7.7 3.5l.1.1a1.7 1.7 0 0 0 2.9-1.2V2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1A2 2 0 1 1 20.5 6l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.2 2z"/></svg>
+  </button>
+</header>
+
+<button id="lade-griff" title="Werkzeuge und Fertigkeiten ein-/ausklappen">
+  <span class="pfeil">▾</span><span>WERKZEUGE &amp; FERTIGKEITEN</span><span class="pfeil">▾</span>
+</button>
+<section id="lade">
+  <div id="lade-kopf">
+    <input id="lade-suche" placeholder="filtern …">
+    <button class="filter an" data-f="alle">alle</button>
+    <button class="filter" data-f="liest">liest</button>
+    <button class="filter" data-f="schreibt">schreibt</button>
+    <button class="filter" data-f="fertigkeit">eigene</button>
+    <button class="filter" data-f="ungenutzt">nie benutzt</button>
+    <span id="lade-zahl" style="margin-left:auto"></span>
+  </div>
+  <div id="lade-band">
+    <canvas id="lade-leinwand"></canvas>
+    <div id="lade-balken"><i></i></div>
+    <div id="lade-schwebe"></div>
+  </div>
+</section>
+
+<main id="board">
+  <section id="links">
+    <div id="verlauf"></div>
+    <div id="eingabe">
+      <div id="magie">
+        <div id="magie-kopf"><span id="magie-titel"></span>
+          <span style="margin-left:auto" id="magie-zahl"></span></div>
+        <div id="magie-liste"></div>
+      </div>
+      <div id="kasten">
+        <span id="zeiger">›</span>
+        <textarea id="feld" rows="1" spellcheck="false"
+          placeholder="Frage, Auftrag, /befehl oder [werkzeug] …"></textarea>
+        <button id="senden" title="Enter"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+      </div>
+      <div id="fusszeile">
+        <span><b>/</b> Befehle</span><span><b>[</b> Werkzeuge</span>
+        <span><b>↑↓</b> wählen</span><span><b>⇧Enter</b> neue Zeile</span><span><b>Strg+L</b> Protokoll</span>
+        <span id="dauer"></span>
+      </div>
+    </div>
+  </section>
+
+  <div id="griff" title="Ziehen zum Verschieben"></div>
+
+  <section id="rechts">
+    <canvas id="hirn-leinwand"></canvas>
+    <div id="hirn-kopf">
+      <input id="hirn-suche" placeholder="Notiz suchen …">
+      <button class="hknopf" id="h-verwaist">verwaiste</button>
+      <button class="hknopf" id="h-mitte">zentrieren</button>
+      <button class="hknopf" id="h-neu">neu laden</button>
+      <div id="hirn-info">lädt …</div>
+    </div>
+    <div class="schwebe" id="hirn-schwebe"></div>
+
+    <aside class="blende" id="notiz-blende">
+      <div class="blende-kopf">
+        <div style="flex:1"><h3 id="n-titel">–</h3><div class="pfad" id="n-pfad"></div></div>
+        <button class="zu" data-zu="notiz-blende">×</button>
+      </div>
+      <div class="blende-rumpf" id="n-rumpf"></div>
+      <div class="blende-fuss">
+        <button class="tat" id="n-chat">in den Chat</button>
+        <button class="tat matt" id="n-nachbarn">Nachbarn</button>
+      </div>
+    </aside>
+
+    <aside id="log">
+      <div id="log-kopf">
+        <h3>PROTOKOLL</h3>
+        <span class="zahl" id="log-zahl">–</span>
+        <button class="zu" id="log-fest" title="Anheften – schiebt das Hirn zusammen, statt es zu verdecken">⇥</button>
+        <button class="zu" id="log-zu" title="Schließen">×</button>
+      </div>
+      <div id="log-filter"></div>
+      <div id="log-zeilen"></div>
+      <div id="log-fuss">
+        <span class="pfad" id="log-pfad">–</span>
+        <button id="log-folgen" class="an" title="Automatisch nach unten scrollen">folgen</button>
+        <button id="log-leeren" title="Nur die Anzeige – die Datei bleibt">leeren</button>
+      </div>
+    </aside>
+
+    <aside class="blende" id="einst-blende">
+      <div class="blende-kopf">
+        <div style="flex:1"><h3>Einstellungen</h3><div class="pfad" id="e-pfad"></div></div>
+        <button class="zu" data-zu="einst-blende">×</button>
+      </div>
+      <div id="einst-rumpf"></div>
+      <div class="blende-fuss">
+        <span id="e-stand" style="flex:1;font-size:var(--t-s);color:var(--text-matt);align-self:center">Keine Änderung.</span>
+        <button class="tat" id="e-speichern" style="flex:0 0 110px" disabled>Speichern</button>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<script>
+"use strict";
+const SCHLUESSEL = "__ZEUS_SCHLUESSEL__";
+const $ = (w) => document.querySelector(w);
+const $$ = (w) => [...document.querySelectorAll(w)];
+const schuetzen = (t) => String(t??"").replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const zahl = (n) => new Intl.NumberFormat("de-DE").format(n);
+const uhr = () => new Date().toLocaleTimeString("de-DE", {hour12:false});
+
+async function hole(pfad, daten){
+  const opt = {headers:{"X-Zeus-Schluessel":SCHLUESSEL}};
+  if(daten){ opt.method="POST"; opt.headers["Content-Type"]="application/json";
+             opt.body=JSON.stringify(daten); }
+  const a = await fetch(pfad, opt);
+  const t = await a.text();
+  try{ return JSON.parse(t); }
+  catch(e){ throw new Error(`Unlesbare Antwort (${a.status}): ${t.slice(0,180)}`); }
+}
+
+/* ================================================== Markdown (klein) */
+/* Ein Bild aus ```svg darf hinein - aber nur als Bild.
+   Der Inhalt kommt aus darstellung.py und ist damit vertrauenswuerdig; ein
+   Modell kann denselben Zaun aber ebenso hinschreiben, und dann stuende
+   fremdes Markup ungefiltert im Dokument. Deshalb ein Weissfilter: erlaubt
+   ist eine feste Liste zeichnender Elemente, alles andere faellt raus, und
+   jedes on...-Attribut ebenso. Was den Filter nicht besteht, wird als Text
+   angezeigt statt gezeichnet - sichtbar, aber wirkungslos. */
+const SVG_ERLAUBT =
+  /^(svg|g|defs|marker|rect|circle|ellipse|line|polyline|polygon|path|text|tspan|title)$/i;
+function svgSaeubern(roh){
+  const text = String(roh ?? "");
+  if(!/^\s*<svg[\s>]/i.test(text)) return null;
+  if(text.length > 400000) return null;
+  let ok = true;
+  text.replace(/<\/?([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g, (m, tag, attr) => {
+    if(!SVG_ERLAUBT.test(tag)) ok = false;
+    if(/\son[a-z]+\s*=/i.test(attr)) ok = false;
+    if(/(?:href|xlink:href|src)\s*=\s*["']?\s*(?:javascript|data):/i.test(attr)) ok = false;
+    return m;
+  });
+  if(/<(?![a-zA-Z\/!])/.test(text)) ok = false;   // zerbrochenes Dokument
+  return ok ? text : null;
+}
+
+function markdown(roh){
+  let t = schuetzen(roh);
+  const bloecke = [];
+  // Die Rohfassung mitfuehren: der SVG-Zaun braucht den UNgeschuetzten Text,
+  // weil schuetzen() die spitzen Klammern bereits ersetzt hat.
+  const rohBloecke = [];
+  String(roh ?? "").replace(/```(\w*)\n([\s\S]*?)```/g, (m,spr,code) => {
+    rohBloecke.push([spr, code]); return m; });
+  let nr = -1;
+  // Platzhalter mit einem Zeichen, das in keinem Text vorkommt.
+  // Eine blosse Zahl als Marke wuerde "NUM_PREDICT 2048"
+  // beim Zuruecksetzen in einen Codeblock verwandeln.
+  t = t.replace(/```(\w*)\n([\s\S]*?)```/g, (m,spr,code) => {
+    nr++;
+    if(/^svg$/i.test(spr)){
+      const sauber = svgSaeubern((rohBloecke[nr]||[])[1]);
+      if(sauber){
+        bloecke.push(`<figure class="zeichnung">${sauber}</figure>`);
+        return `\u0000${bloecke.length-1}\u0000`;
+      }
+    }
+    bloecke.push(`<pre><code>${code.replace(/\n$/,"")}</code></pre>`);
+    return `\u0000${bloecke.length-1}\u0000`;
+  });
+  t = t.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  t = t.replace(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g,
+        (m,n) => `<a class="wiki" data-notiz="${schuetzen(n)}">${schuetzen(n)}</a>`);
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  const aus = []; let liste=null, tab=false;
+  const lz = () => { if(liste){ aus.push(`</${liste}>`); liste=null; } };
+  const tz = () => { if(tab){ aus.push("</table>"); tab=false; } };
+  for(const roh2 of t.split("\n")){
+    const z = roh2.trimEnd(); let m;
+    if((m = z.match(/^(#{1,4})\s+(.*)$/))){ lz(); tz();
+      const s = Math.min(m[1].length+1,4); aus.push(`<h${s}>${m[2]}</h${s}>`); }
+    else if(/^\s*\|.*\|\s*$/.test(z)){ lz();
+      if(/^\s*\|[\s:|-]+\|\s*$/.test(z)) continue;
+      const f = z.trim().slice(1,-1).split("|").map(s=>s.trim());
+      if(!tab){ aus.push("<table>"); tab=true;
+        aus.push("<tr>"+f.map(x=>`<th>${x}</th>`).join("")+"</tr>"); }
+      else aus.push("<tr>"+f.map(x=>`<td>${x}</td>`).join("")+"</tr>"); }
+    else if((m = z.match(/^\s*[-*+]\s+(.*)$/))){ tz();
+      if(liste!=="ul"){ lz(); aus.push("<ul>"); liste="ul"; } aus.push(`<li>${m[1]}</li>`); }
+    else if((m = z.match(/^\s*\d+[.)]\s+(.*)$/))){ tz();
+      if(liste!=="ol"){ lz(); aus.push("<ol>"); liste="ol"; } aus.push(`<li>${m[1]}</li>`); }
+    else if(z.trim()===""){ lz(); tz(); }
+    else { lz(); tz(); aus.push(`<p>${z}</p>`); }
+  }
+  lz(); tz();
+  return aus.join("").replace(/\u0000(\d+)\u0000/g, (m,i) => bloecke[+i]);
+}
+
+/* ============================================================== Chat */
+const verlauf = $("#verlauf"), feld = $("#feld");
+let laeuft = false, begonnen = 0;
+const ZUSTAND = {};
+
+function zeile(marke, klasse){
+  const el = document.createElement("div");
+  el.className = "zeile " + klasse;
+  el.innerHTML = `<div class="marke"><span>${schuetzen(marke)}</span>`
+    + `<span class="zeit">${uhr()}</span></div><div class="rumpf"></div>`;
+  verlauf.appendChild(el); runter();
+  return el.querySelector(".rumpf");
+}
+function runter(){ verlauf.scrollTop = verlauf.scrollHeight; }
+function wikiBinden(w){
+  w.querySelectorAll("a.wiki").forEach(a =>
+    a.addEventListener("click", () => notizOeffnen(a.dataset.notiz)));
+}
+function arbeiten(ja){
+  laeuft = ja;
+  document.body.classList.toggle("arbeitet", ja);
+  $("#senden").disabled = ja;
+  $("#zustand").textContent = ja ? "arbeitet …" : "bereit";
+}
+
+feld.addEventListener("input", () => {
+  feld.style.height = "auto";
+  feld.style.height = Math.min(feld.scrollHeight, 190) + "px";
+  magiePruefen();
+});
+feld.addEventListener("keyup", (e) => {
+  if(["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) magiePruefen();
+});
+feld.addEventListener("keydown", (e) => {
+  if(magieOffen() && magieTaste(e)) return;
+  if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); senden(); }
+});
+$("#senden").addEventListener("click", senden);
+$("#knopf-leeren").addEventListener("click", () => { verlauf.innerHTML = ""; });
+
+async function senden(){
+  const text = feld.value.trim();
+  if(!text || laeuft) return;
+  feld.value = ""; feld.style.height = "auto"; magieSchliessen();
+  zeile("DU", "ich").textContent = text;
+
+  const istBefehl = text.startsWith("/");
+  const ziel = zeile(istBefehl ? "BEFEHL" : (ZUSTAND.name || "ZEUS"),
+                     istBefehl ? "sys" : "er");
+  ziel.innerHTML = `<div class="punkte"><i></i><i></i><i></i></div>`;
+  arbeiten(true); begonnen = Date.now();
+  let antwort;
+  try{ antwort = await hole("/api/frage", {frage:text}); }
+  catch(e){ ziel.innerHTML = `<em>Server nicht erreichbar: ${schuetzen(e.message)}</em>`;
+            arbeiten(false); return; }
+  if(antwort.fehler){ ziel.innerHTML = `<em>${schuetzen(antwort.fehler)}</em>`;
+                      arbeiten(false); return; }
+  strom(antwort.id, ziel, istBefehl);
+}
+
+function strom(id, rumpf, istBefehl){
+  const quelle = new EventSource(
+    `/api/strom?id=${encodeURIComponent(id)}&s=${encodeURIComponent(SCHLUESSEL)}`);
+  let roh = "", kasten = null, fertig = false;
+
+  quelle.onmessage = (ev) => {
+    let d; try{ d = JSON.parse(ev.data); }catch(e){ return; }
+
+    if(d.art === "token"){
+      roh += d.text;
+      rumpf.querySelector(".punkte")?.remove();
+      let z = rumpf.querySelector(".strom");
+      if(!z){ z = document.createElement("div"); z.className="strom"; rumpf.prepend(z); }
+      z.innerHTML = markdown(roh); runter();
+    }
+    else if(d.art === "protokoll"){
+      logDazu(d.eintrag, !log.offen);
+    }
+    else if(d.art === "schritt"){
+      lade.schrittMelden(d.werkzeug, d.schritt);
+    }
+    else if(d.art === "werkzeug"){
+      rumpf.querySelector(".punkte")?.remove();
+      if(!kasten){ kasten = document.createElement("div");
+                   kasten.className = "werkzeuge"; rumpf.appendChild(kasten); }
+      const w = document.createElement("div");
+      w.className = "wz " + (d.ok ? "ok" : "fehler");
+      const args = Object.entries(d.parameter||{})
+        .map(([k,v]) => `${k}=${v.length>52 ? v.slice(0,52)+"…" : v}`).join(", ");
+      w.innerHTML = `<span class="z">${d.ok?"✔":"✖"}</span><span><b>${schuetzen(d.name)}</b>`
+        + (args ? ` <span class="was">(${schuetzen(args)})</span>` : "")
+        + `<br><span class="was">${schuetzen(d.meldung)}</span></span>`;
+      kasten.appendChild(w); runter();
+    }
+    else if(d.art === "fertig"){
+      fertig = true;
+      rumpf.querySelector(".punkte")?.remove();
+      const alt = rumpf.querySelector(".strom");
+      const neu = document.createElement("div");
+      if(istBefehl){
+        // Befehlsausgabe kommt fertig gesetzt aus dem Terminal. Unveraendert
+        // zeigen - umformatieren wuerde Tabellen und Baeume zerreissen.
+        neu.className = "konsole";
+        neu.textContent = d.text || "(keine Ausgabe)";
+      } else {
+        neu.className = "strom";
+        neu.innerHTML = markdown(d.text || roh || "");
+        wikiBinden(neu);
+      }
+      if(alt) alt.replaceWith(neu); else rumpf.prepend(neu);
+      if(d.quellen && d.quellen.length){
+        const q = document.createElement("div"); q.className = "quellen";
+        q.innerHTML = d.quellen.map(x =>
+          `<span class="quelle" data-notiz="${schuetzen(x.name)}" `
+          + `title="${schuetzen(x.ordner||"Wurzel")} · Güte ${x.guete}">`
+          + `${schuetzen(x.name)}</span>`).join("");
+        q.querySelectorAll(".quelle").forEach(s =>
+          s.addEventListener("click", () => notizOeffnen(s.dataset.notiz)));
+        rumpf.appendChild(q);
+      }
+      runter();
+      statusHolen();
+      if(lade.geladen) ladeLaden();       // Nutzungszahlen haben sich geaendert
+    }
+    else if(d.art === "fehler"){
+      rumpf.querySelector(".punkte")?.remove();
+      const e = document.createElement("div");
+      e.innerHTML = `<em>${schuetzen(d.text)}</em>`; rumpf.appendChild(e);
+    }
+    else if(d.art === "ende"){
+      quelle.close(); arbeiten(false); lade.ruhe();
+      if(log.offen) logMalen();
+      $("#dauer").textContent = ((Date.now()-begonnen)/1000).toFixed(1).replace(".",",")+" s";
+      if(!fertig && !roh.trim())
+        rumpf.innerHTML = "<em>Keine Antwort. Prüfe Server und Modell "
+          + "(Zahnrad oben rechts, oder <code>/server</code>).</em>";
+    }
+  };
+  quelle.onerror = () => { quelle.close(); arbeiten(false); };
+}
+
+/* ============================================ Magic: [ und / im Feld
+   Zwei Ausloeser, eine Mechanik. `[` bietet Werkzeuge und Fertigkeiten
+   und schliesst mit `]`. `/` am Zeilenanfang bietet Befehle, danach
+   deren Argumente - je nach Befehl aus Fertigkeiten, Notizen, Ordnern,
+   Quelldateien oder einer festen Auswahl. Alles kommt vom Server, damit
+   die Liste nie etwas anbietet, das es nicht gibt.
+   =================================================================== */
+const magie = {offen:false, art:"", gefiltert:[], wahl:0, von:0, puffer:{}};
+const magieEl = $("#magie"), magieListe = $("#magie-liste");
+let BEFEHLE = [];
+
+const magieOffen = () => magie.offen;
+function magieSchliessen(){ magie.offen = false; magieEl.classList.remove("da"); }
+
+async function befehleHolen(){
+  if(!BEFEHLE.length) BEFEHLE = (await hole("/api/befehle")).befehle || [];
+  return BEFEHLE;
+}
+async function liste(art){
+  if(magie.puffer[art]) return magie.puffer[art];
+  const d = await hole("/api/vorschlaege?art=" + encodeURIComponent(art));
+  magie.puffer[art] = d.eintraege || [];
+  return magie.puffer[art];
+}
+
+async function magiePruefen(){
+  const wert = feld.value, pos = feld.selectionStart;
+  const bis = wert.slice(0, pos);
+
+  // --- "/" am Anfang: Befehlsliste ---
+  if(/^\/[\wäöüß?-]*$/.test(bis)){
+    const befehle = await befehleHolen();
+    return magieZeigen("BEFEHLE", befehle.map(b => ({
+      name: "/" + b.name, hinweis: b.gruppe,
+      kurz: b.kurz + (b.wo === "terminal" ? "  · nur Terminal" : "")
+            + (b.argumenthilfe ? "  " + b.argumenthilfe : ""),
+      such: [b.name, ...b.aliase].join(" "), roh: b,
+    })), bis.slice(1), 0, "befehl");
+  }
+
+  // --- "/befehl arg": Argumentliste ---
+  const arg = bis.match(/^\/([\wäöüß-]+)\s+([^\s]*)$/);
+  if(arg){
+    const befehle = await befehleHolen();
+    const b = befehle.find(x => x.name === arg[1].toLowerCase()
+                             || x.aliase.includes(arg[1].toLowerCase()));
+    if(b && b.argument !== "keins" && b.argument !== "frei"){
+      let eintraege = [];
+      if(b.argument === "wahl" || b.argument === "an_aus"){
+        const werte = b.argument === "an_aus" ? ["an","aus"] : (b.wahl || []);
+        eintraege = werte.map(w => ({name:w, hinweis:"Wert", kurz:"", such:w}));
+      } else {
+        const art = {fertigkeit:"fertigkeit", notiz:"notiz", ordner:"ordner",
+                     codedatei:"codedatei", datei:"codedatei"}[b.argument];
+        if(art) eintraege = (await liste(art)).map(e =>
+          ({name:e.name, hinweis:e.hinweis, kurz:e.kurz, such:e.name}));
+      }
+      if(eintraege.length)
+        return magieZeigen(`/${b.name} ${b.argumenthilfe||""}`.trim(), eintraege,
+                           arg[2], bis.length - arg[2].length, "wert");
+    }
+    magieSchliessen(); return;
+  }
+
+  // --- offene eckige Klammer: Werkzeuge und Fertigkeiten ---
+  const klammer = bis.lastIndexOf("[");
+  if(klammer !== -1 && !bis.slice(klammer).includes("]")){
+    const roh = bis.slice(klammer+1);
+    if(!/\s\s/.test(roh)){
+      const eintraege = (await liste("werkzeug")).map(e => ({
+        name:e.name, hinweis:e.hinweis,
+        kurz:e.kurz + ((e.parameter||[]).length ? `  (${e.parameter.join(", ")})` : ""),
+        zahlwert:e.aufrufe, such:e.name + " " + e.kurz}));
+      return magieZeigen("WERKZEUGE & FERTIGKEITEN", eintraege, roh, klammer+1, "werkzeug");
+    }
+  }
+  magieSchliessen();
+}
+
+function magieZeigen(titel, eintraege, filter, von, art){
+  magie.art = art; magie.von = von;
+  const f = (filter || "").toLowerCase();
+  magie.gefiltert = eintraege.filter(e => !f || (e.such||e.name).toLowerCase().includes(f));
+  // Wer vorn passt, steht oben. Sonst sucht man "notiz" und findet zuerst
+  // "uebersichtsnotiz".
+  magie.gefiltert.sort((a,b) => {
+    const av = a.name.toLowerCase().replace(/^\//,"").startsWith(f) ? 0 : 1;
+    const bv = b.name.toLowerCase().replace(/^\//,"").startsWith(f) ? 0 : 1;
+    return av - bv || a.name.localeCompare(b.name);
+  });
+  if(!magie.gefiltert.length){ magieSchliessen(); return; }
+  magie.wahl = 0; magie.offen = true;
+  $("#magie-titel").textContent = titel;
+  magieEl.classList.add("da");
+  magieMalen();
+}
+
+function magieMalen(){
+  $("#magie-zahl").textContent = `${magie.wahl+1}/${magie.gefiltert.length}`;
+  magieListe.innerHTML = magie.gefiltert.map((e,i) =>
+    `<div class="mv ${i===magie.wahl?"gewaehlt":""}" data-i="${i}">`
+    + `<span class="mn">${schuetzen(e.name)}</span>`
+    + (e.hinweis ? `<span class="mh">${schuetzen(e.hinweis)}</span>` : "")
+    + `<span class="mk">${schuetzen(e.kurz||"")}</span>`
+    + (e.zahlwert ? `<span class="mz">${zahl(e.zahlwert)}×</span>` : "")
+    + `</div>`).join("");
+  magieListe.querySelectorAll(".mv").forEach(el => {
+    el.addEventListener("mouseenter", () => { magie.wahl = +el.dataset.i; magieMalen(); });
+    el.addEventListener("mousedown", (e) => { e.preventDefault(); magieNehmen(); });
+  });
+  magieListe.querySelector(".gewaehlt")?.scrollIntoView({block:"nearest"});
+}
+
+function magieTaste(e){
+  const n = magie.gefiltert.length;
+  if(e.key === "ArrowDown"){ e.preventDefault(); magie.wahl=(magie.wahl+1)%n;
+    magieMalen(); return true; }
+  if(e.key === "ArrowUp"){ e.preventDefault(); magie.wahl=(magie.wahl-1+n)%n;
+    magieMalen(); return true; }
+  if(e.key === "Enter" || e.key === "Tab"){ e.preventDefault(); magieNehmen(); return true; }
+  if(e.key === "Escape"){ e.preventDefault(); magieSchliessen(); return true; }
+  return false;
+}
+
+function magieNehmen(){
+  const wahl = magie.gefiltert[magie.wahl];
+  if(!wahl) return;
+  const wert = feld.value, pos = feld.selectionStart;
+  const vorn = wert.slice(0, magie.von), hinten = wert.slice(pos);
+  // Beim Werkzeug wird die schliessende Klammer MITGESCHRIEBEN: auswaehlen,
+  // und der Ausdruck steht fertig da.
+  const eingesetzt = magie.art === "werkzeug" ? wahl.name + "] " : wahl.name + " ";
+  const neuerCursor = vorn.length + eingesetzt.length;
+  feld.value = vorn + eingesetzt + hinten;
+  feld.setSelectionRange(neuerCursor, neuerCursor);
+  magieSchliessen();
+  feld.focus();
+  feld.dispatchEvent(new Event("input"));   // Argumentliste geht von allein auf
+}
+document.addEventListener("mousedown", (e) => {
+  if(!magieEl.contains(e.target) && e.target !== feld) magieSchliessen();
+});
+
+/* ================================= Die Lade: Sternbilder im Schieber
+   Die Skyrim-Ansicht aus der ersten Fassung, nur nicht mehr als eigene
+   Seite, sondern als waagerechtes Band im Schieber. Vier Merkmale, vier
+   Fragen:
+
+     Helligkeit/Groesse  Aufrufe      Benutze ich das ueberhaupt?
+     Farbe               Fehlerquote  Ist es zuverlaessig?
+     Ring                in Tests     Kann ich mich darauf verlassen?
+     Sternbild           Aufgabenfeld Wo ist die Luecke?
+
+   Ein nie aufgerufenes Werkzeug bleibt matt - wie ein nicht gelernter Perk.
+   =================================================================== */
+const SCHREIBFELDER = ["schreiben","struktur","bewahren"];
+
+class Sternenlade{
+  constructor(){
+    this.el = $("#lade-leinwand"); this.ctx = this.el.getContext("2d");
+    this.geladen = false; this.daten = null;
+    this.sterne = []; this.linien = []; this.kerne = [];
+    this.x = 0; this.breiteWelt = 0; this.b = 0; this.h = 0;
+    this.suche = ""; this.filter = "alle"; this.schwebend = null;
+    this.laeuft = "";                     // Werkzeug, das gerade arbeitet
+    this.zeit = 0; this._laeuft = false; this.zieht = false; this.gezogen = false;
+    this._binden();
+    new ResizeObserver(() => this.groesse()).observe($("#lade-band"));
+  }
+  groesse(){
+    const r = $("#lade-band").getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    const p = window.devicePixelRatio || 1;
+    this.b = r.width; this.h = r.height;
+    this.el.width = r.width*p; this.el.height = r.height*p;
+    this.ctx.setTransform(p,0,0,p,0,0);
+    this.zeichnen();
+  }
+  _binden(){
+    const el = this.el;
+    // Mausrad schiebt SEITWAERTS. Ein Band scrollt man nicht senkrecht.
+    el.addEventListener("wheel", e => {
+      e.preventDefault();
+      this.schieben(this.x - (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX));
+      this.schweben(null);
+    }, {passive:false});
+    el.addEventListener("mousedown", e => {
+      this.zieht = true; this.gezogen = false; this.sx = e.offsetX - this.x;
+      el.classList.add("zieht");
+    });
+    window.addEventListener("mouseup", () => {
+      this.zieht = false; el.classList.remove("zieht"); });
+    el.addEventListener("mousemove", e => {
+      if(this.zieht){
+        if(Math.abs(e.offsetX - this.sx - this.x) > 2) this.gezogen = true;
+        this.schieben(e.offsetX - this.sx); this.schweben(null);
+      } else this.bewegt(e.offsetX, e.offsetY);
+    });
+    el.addEventListener("mouseleave", () => { this.schwebend = null; this.schweben(null); });
+    el.addEventListener("click", e => {
+      if(this.gezogen) return;
+      const s = this.treffer(e.offsetX, e.offsetY);
+      if(!s) return;
+      // Klick setzt [name] ins Feld - derselbe Ausdruck wie aus der
+      // Magic-Eingabe, und der ruft das Werkzeug wirklich auf.
+      const pos = feld.selectionStart;
+      feld.value = feld.value.slice(0,pos) + `[${s.name}] ` + feld.value.slice(pos);
+      const n = pos + s.name.length + 3;
+      feld.focus(); feld.setSelectionRange(n, n);
+      feld.dispatchEvent(new Event("input"));
+    });
+  }
+  schieben(x){
+    const rand = Math.min(0, this.b - this.breiteWelt - 40);
+    this.x = Math.max(rand, Math.min(20, x));
+    this.zeichnen();
+  }
+  schweben(inhalt, px, py){
+    const el = $("#lade-schwebe");
+    if(!inhalt){ el.classList.remove("da"); return; }
+    el.innerHTML = inhalt; el.classList.add("da");
+    const r = el.getBoundingClientRect();
+    // Mit der GEDECKELTEN Hoehe rechnen, nicht mit der gemessenen: Beim
+    // ersten Zeichnen ist die Karte noch nicht umgebrochen, misst zu klein,
+    // und die Schrittliste rutscht unten aus dem Band.
+    const hoehe = Math.max(r.height, 244);
+    el.style.left = Math.max(6, Math.min(px + 15, this.b - r.width - 10)) + "px";
+    el.style.top  = Math.max(6, Math.min(py + 15, this.h - hoehe - 8)) + "px";
+  }
+
+  setzen(d){
+    this.daten = d;
+    this.aufbauen();
+    this.geladen = true;
+    this.schleife();
+  }
+  /** Sternbilder NEBENEINANDER - ein Band, kein Raster. */
+  aufbauen(){
+    this.sterne = []; this.linien = []; this.kerne = [];
+    if(!this.daten) return;
+    const f = this.filter, su = this.suche;
+    const passt = (s) => {
+      if(su && !(s.name + " " + (s.beschreibung||"")).toLowerCase().includes(su)) return false;
+      if(f === "liest") return !s.eigen && !SCHREIBFELDER.includes(s.schluessel);
+      if(f === "schreibt") return SCHREIBFELDER.includes(s.schluessel);
+      if(f === "fertigkeit") return !!s.eigen;
+      if(f === "ungenutzt") return !s.freigeschaltet;
+      return true;
+    };
+    let x = 150, gesamt = 0, gezeigt = 0;
+    // Der Titel steht OBEN, das Sternbild haengt darunter - wie im Spiel.
+    // In der ersten Fassung oeffneten sich die Boegen nach oben und liefen
+    // dem Titel ins Gesicht.
+    const kopfhoehe = 26, ursprung = 62;
+    for(const bild of this.daten.sternbilder){
+      const sterne = bild.sterne
+        .map(s => ({...s, schluessel:bild.schluessel, bild:bild.titel}))
+        .filter(passt);
+      gesamt += bild.sterne.length;
+      if(!sterne.length) continue;
+      gezeigt += sterne.length;
+      const n = sterne.length;
+      const breite = Math.max(190, 74 * Math.ceil(n / 2));
+      const kern = {x: x + breite/2, y: kopfhoehe, yl: ursprung, titel: bild.titel,
+                    anzahl: bild.sterne.length,
+                    frei: bild.sterne.filter(s => s.freigeschaltet).length};
+      this.kerne.push(kern);
+      const eigene = [];
+      sterne.forEach((s, j) => {
+        // Abwechselnd innerer und aeusserer Bogen: zwei Nachbarn stehen
+        // damit nie auf derselben Hoehe, und die Namen ueberlappen nicht.
+        const ring = j % 2;
+        const spanne = Math.PI * (n > 6 ? 1.05 : .8);
+        // +PI/2 statt -PI/2: der Bogen oeffnet sich nach UNTEN.
+        const winkel = Math.PI/2 - spanne/2 + (n <= 1 ? spanne/2 : spanne*j/(n-1));
+        // Die beiden Ringe deutlich auseinander, und die Hoehe des Bandes
+        // wirklich ausnutzen - flachgedrueckt liegen die Namen sonst wieder
+        // uebereinander.
+        const r = (ring === 0 ? 60 : 118) + n * 1.2;
+        const stern = {...s, ring,
+          x: kern.x + Math.cos(winkel) * r * (breite/210),
+          y: ursprung + Math.abs(Math.sin(winkel)) * r * 1.02,
+          flimmer: Math.random() * 6.28};
+        // Die Schritte als kleine Trabanten um den Stern - ein Netz wie in
+        // einem Passivbaum, nicht bloss ein Punkt. Sie leuchten der Reihe
+        // nach auf, wenn das Werkzeug wirklich laeuft.
+        const schritte = s.schritte || [];
+        stern.trabanten = schritte.map((sch, i) => {
+          const w = -Math.PI/2 + (i - (schritte.length-1)/2) * (Math.PI*1.5/Math.max(schritte.length,3));
+          const rr = 15 + (schritte.length > 5 ? 4 : 0);
+          return {...sch, x: stern.x + Math.cos(w)*rr,
+                          y: stern.y + Math.sin(w)*rr*.9, an: false};
+        });
+        this.sterne.push(stern); eigene.push(stern);
+        this.linien.push({a: {x: kern.x, y: kern.yl}, b: stern,
+                          stark: s.freigeschaltet});
+      });
+      for(let j=1; j<eigene.length; j++)
+        this.linien.push({a: eigene[j-1], b: eigene[j],
+                          stark: eigene[j-1].freigeschaltet && eigene[j].freigeschaltet});
+      x += breite + 110;
+    }
+    this.breiteWelt = x;
+    $("#lade-zahl").textContent = `${gezeigt}/${gesamt} · `
+      + `${this.daten.freigeschaltet} benutzt · ${this.daten.getestet} in Tests`;
+    this.schieben(this.x);
+  }
+  schleife(){
+    if(this._laeuft) return;
+    this._laeuft = true;
+    const tick = () => {
+      this.zeit += .016;
+      // Nur zeichnen, solange die Lade offen ist - ein Sternenhimmel hinter
+      // einer geschlossenen Klappe kostet nur Strom.
+      if(document.body.classList.contains("lade-auf")) this.zeichnen();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  /** Ein Schritt wurde gemeldet: Stern markieren, Trabant anzuenden. */
+  schrittMelden(werkzeug, schritt){
+    if(!werkzeug) return;
+    this.laeuft = werkzeug;
+    const stern = this.sterne.find(s => s.name === werkzeug);
+    if(!stern) return;
+    for(const t of (stern.trabanten || []))
+      if(t.schluessel === schritt) t.an = true;
+    if(!document.body.classList.contains("lade-auf")) return;
+    this.zeichnen();
+  }
+  /** Auftrag vorbei: alles wieder auf Anfang, nichts bleibt an. */
+  ruhe(){
+    this.laeuft = "";
+    for(const s of this.sterne)
+      for(const t of (s.trabanten || [])) t.an = false;
+    this.zeichnen();
+  }
+  farbe(s){
+    if(!s.freigeschaltet) return "#4a5470";
+    if(s.aufrufe < 3) return "#9fe4ff";            // zu wenig fuer ein Urteil
+    if(s.fehlerquote > .3) return "#e8685d";
+    if(s.fehlerquote > .1) return "#e8b04b";
+    return "#57d9a3";
+  }
+  radius(s){ return 2.4 + s.stufe*1.3 + (s.eigen ? 1 : 0); }
+  zeichnen(){
+    const c = this.ctx;
+    if(!c || !this.b) return;
+    c.clearRect(0,0,this.b,this.h);
+    c.save(); c.translate(this.x, 0);
+
+    for(const l of this.linien){
+      c.strokeStyle = l.stark ? "rgba(95,211,245,.30)" : "rgba(95,211,245,.08)";
+      c.lineWidth = l.stark ? 1 : .7;
+      c.beginPath(); c.moveTo(l.a.x, l.a.y); c.lineTo(l.b.x, l.b.y); c.stroke();
+    }
+    for(const k of this.kerne){
+      c.textAlign = "center";
+      c.fillStyle = "rgba(95,211,245,.9)";
+      c.font = "600 12px ui-monospace, monospace";
+      c.fillText(k.titel.toUpperCase(), k.x, k.y);
+      c.fillStyle = "rgba(131,144,168,.8)";
+      c.font = "9.5px ui-monospace, monospace";
+      c.fillText(`${k.frei}/${k.anzahl} benutzt`, k.x, k.y + 13);
+    }
+    const belegt = this.kerne.map(k =>
+      ({x0:k.x-95, x1:k.x+95, y0:k.y-14, y1:k.y+20}));
+    for(const s of this.sterne){
+      const be = this.schwebend === s.name;
+      const r = this.radius(s);
+      const puls = s.freigeschaltet ? (1 + Math.sin(this.zeit*1.5 + s.flimmer)*.11) : 1;
+      const farbe = this.farbe(s);
+
+      if(s.freigeschaltet || be){
+        const g = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, r*5*puls);
+        g.addColorStop(0, farbe + "cc"); g.addColorStop(1, farbe + "00");
+        c.fillStyle = g;
+        c.beginPath(); c.arc(s.x, s.y, r*5*puls, 0, 6.2832); c.fill();
+      }
+      c.fillStyle = be ? "#ffffff" : farbe;
+      c.beginPath(); c.arc(s.x, s.y, r*puls, 0, 6.2832); c.fill();
+      if(s.getestet){                                // Ring = kommt in Tests vor
+        c.strokeStyle = be ? "rgba(255,255,255,.9)" : farbe + "88";
+        c.lineWidth = 1;
+        c.beginPath(); c.arc(s.x, s.y, r + 3.6, 0, 6.2832); c.stroke();
+      }
+      if(s.stufe >= 3 || be){                        // Strahlen ab Stufe 3
+        c.strokeStyle = farbe + (be ? "ff" : "66"); c.lineWidth = .9;
+        const l = r*2.7*puls;
+        c.beginPath();
+        c.moveTo(s.x-l, s.y); c.lineTo(s.x+l, s.y);
+        c.moveTo(s.x, s.y-l); c.lineTo(s.x, s.y+l);
+        c.stroke();
+      }
+      // Die Trabanten: ein Punkt je innerem Schritt. Matt, solange nichts
+      // laeuft - ein Schritt, der nicht gemeldet wurde, behauptet nicht,
+      // stattgefunden zu haben.
+      for(const t of (s.trabanten || [])){
+        c.beginPath(); c.arc(t.x, t.y, t.an ? 2.2 : 1.3, 0, 6.2832);
+        c.fillStyle = t.an ? "#eaf6ff" : (be ? farbe + "aa" : "rgba(95,211,245,.22)");
+        c.fill();
+        if(t.an){
+          c.strokeStyle = "rgba(234,246,255,.55)"; c.lineWidth = .8;
+          c.beginPath(); c.moveTo(s.x, s.y); c.lineTo(t.x, t.y); c.stroke();
+        }
+      }
+      if(s.name === this.laeuft){
+        // Der Ring um das gerade arbeitende Werkzeug - er atmet.
+        const p2 = 1 + Math.sin(this.zeit*4)*.16;
+        c.strokeStyle = "rgba(95,211,245,.85)"; c.lineWidth = 1.4;
+        c.beginPath(); c.arc(s.x, s.y, (r + 9) * p2, 0, 6.2832); c.stroke();
+      }
+
+      // Namen ausweichen lassen statt uebereinanderlegen.
+      c.font = "9.5px ui-monospace, monospace"; c.textAlign = "center";
+      const bb = c.measureText(s.name).width;
+      const richtung = s.ring === 0 ? 1 : -1;
+      let y = null;
+      for(let v=0; v<5; v++){
+        const dy = 12 + Math.floor(v/2)*10;
+        const yv = s.y + (v%2===0 ? richtung : -richtung) * (r + dy);
+        const kasten = {x0:s.x-bb/2-3, x1:s.x+bb/2+3, y0:yv-10, y1:yv+3};
+        if(!belegt.some(z => kasten.x0<z.x1 && kasten.x1>z.x0
+                          && kasten.y0<z.y1 && kasten.y1>z.y0)){
+          belegt.push(kasten); y = yv; break; }
+      }
+      if(y === null && be) y = s.y - r - 12;
+      if(y !== null){
+        c.fillStyle = be ? "#eaf6ff" : "rgba(215,224,238,.62)";
+        c.fillText(s.name, s.x, y);
+      }
+    }
+    c.restore();
+
+    const anteil = this.breiteWelt > this.b
+      ? Math.max(.06, this.b / this.breiteWelt) : 1;
+    const weg = this.breiteWelt > this.b
+      ? (-this.x) / (this.breiteWelt - this.b + 40) : 0;
+    const balken = $("#lade-balken").firstElementChild;
+    balken.style.width = (anteil*100) + "%";
+    balken.style.marginLeft = (Math.max(0, Math.min(1, weg)) * (100 - anteil*100)) + "%";
+  }
+  treffer(px, py){
+    let best = null, d0 = 1e9;
+    for(const s of this.sterne){
+      const d = Math.hypot(s.x + this.x - px, s.y - py);
+      if(d < this.radius(s) + 11 && d < d0){ d0 = d; best = s; }
+    }
+    return best;
+  }
+  bewegt(px, py){
+    const s = this.treffer(px, py);
+    this.schwebend = s ? s.name : null;
+    if(!s){ this.schweben(null); return; }
+    const raenge = [1,2,3,4,5].map(i => `<i class="${i<=s.stufe?"voll":""}"></i>`).join("");
+    const art = s.eigen ? "selbst gelernt"
+              : SCHREIBFELDER.includes(s.schluessel) ? "verändert die Vault" : "liest nur";
+    this.schweben(
+      `<div class="k">${schuetzen(s.name)}</div>`
+      + `<div class="u">${schuetzen(s.bild)} · ${art}</div>`
+      + `<div class="b">${schuetzen(s.beschreibung || "Keine Beschreibung.")}</div>`
+      + `<div class="raenge">${raenge}</div>`
+      + `<dl><dt>Aufrufe</dt><dd>${zahl(s.aufrufe)}</dd>`
+      + `<dt>Fehlerquote</dt><dd>${s.aufrufe ? Math.round(s.fehlerquote*100)+" %" : "–"}</dd>`
+      + `<dt>In Tests</dt><dd>${s.getestet ? "ja" : "nein"}</dd>`
+      + ((s.parameter||[]).length
+          ? `<dt>Parameter</dt><dd>${schuetzen(s.parameter.join(", "))}</dd>` : "")
+      + `<dt>Einsetzen</dt><dd>Klick → [${schuetzen(s.name)}]</dd>`
+      + `</dl>`
+      + ((s.schritte||[]).length
+          ? `<div class="schritte">` + s.schritte.map((x,i) =>
+              `<div class="sr ${(s.trabanten||[])[i]?.an ? "an":""}">`
+              + `<b>${i+1}</b> ${schuetzen(x.text)}</div>`).join("") + `</div>`
+          : ""), px, py);
+  }
+}
+const lade = new Sternenlade();
+
+$("#lade-griff").addEventListener("click", () => {
+  document.body.classList.toggle("lade-auf");
+  if(document.body.classList.contains("lade-auf")){
+    lade.groesse();
+    if(!lade.geladen) ladeLaden();
+  }
+});
+$("#lade-suche").addEventListener("input", e => {
+  lade.suche = e.target.value.trim().toLowerCase(); lade.aufbauen(); });
+$$("#lade-kopf .filter").forEach(b => b.addEventListener("click", () => {
+  $$("#lade-kopf .filter").forEach(x => x.classList.remove("an"));
+  b.classList.add("an"); lade.filter = b.dataset.f; lade.x = 0; lade.aufbauen();
+}));
+
+async function ladeLaden(){
+  try{
+    const d = await hole("/api/baum");
+    if(d.fehler) throw new Error(d.fehler);
+    lade.setzen(d);
+  }catch(e){ $("#lade-zahl").textContent = "Fehler: " + e.message; }
+}
+
+/* ============================================= Trennlinie verschieben */
+(function(){
+  const griff = $("#griff"), links = $("#links");
+  let zieht = false;
+  griff.addEventListener("mousedown", () => { zieht = true; griff.classList.add("zieht");
+    document.body.style.userSelect = "none"; });
+  window.addEventListener("mouseup", () => {
+    if(!zieht) return;
+    zieht = false; griff.classList.remove("zieht"); document.body.style.userSelect = "";
+    hirn.groesse();
+  });
+  window.addEventListener("mousemove", (e) => {
+    if(!zieht) return;
+    const b = $("#board").getBoundingClientRect();
+    links.style.width = Math.min(Math.max(e.clientX - b.left, 340), b.width - 300) + "px";
+    hirn.groesse();
+  });
+})();
+
+/* ============================================ Das Hirn (Vault-Graph) */
+class Hirn{
+  constructor(){
+    this.el = $("#hirn-leinwand"); this.ctx = this.el.getContext("2d");
+    this.x=0; this.y=0; this.zoom=1; this.b=0; this.h=0;
+    this.knoten=[]; this.kanten=[]; this.nachbarn=new Map();
+    this.suche=""; this.nurVerwaist=false; this.hervor=new Set();
+    this.gewaehlt=null; this.schwebend=null; this.geladen=false;
+    this.zieht=false; this.gezogen=false;
+    this._binden();
+    new ResizeObserver(() => this.groesse()).observe($("#rechts"));
+  }
+  groesse(){
+    // Die LEINWAND messen, nicht ihren Kasten: Ist das Protokoll angeheftet,
+    // bekommt #rechts ein padding-right. Ueber den Kasten gemessen war der
+    // Puffer breiter als die Darstellung - die Knoten wurden zu Ellipsen.
+    const r = this.el.getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    const p = window.devicePixelRatio || 1;
+    this.b = r.width; this.h = r.height;
+    this.el.width = r.width*p; this.el.height = r.height*p;
+    this.ctx.setTransform(p,0,0,p,0,0);
+    this.zeichnen();
+  }
+  welt(px,py){ return {x:(px-this.x)/this.zoom, y:(py-this.y)/this.zoom}; }
+  _binden(){
+    const el = this.el;
+    el.addEventListener("mousedown", e => { this.zieht=true; this.gezogen=false;
+      this.sx=e.offsetX-this.x; this.sy=e.offsetY-this.y; el.classList.add("zieht"); });
+    window.addEventListener("mouseup", () => { this.zieht=false; el.classList.remove("zieht"); });
+    el.addEventListener("mousemove", e => {
+      if(this.zieht){
+        if(Math.abs(e.offsetX-this.sx-this.x) > 2) this.gezogen = true;
+        this.x = e.offsetX-this.sx; this.y = e.offsetY-this.sy;
+        this.schweben(null); this.zeichnen();
+      } else this.bewegt(e.offsetX, e.offsetY);
+    });
+    el.addEventListener("mouseleave", () => this.schweben(null));
+    el.addEventListener("wheel", e => {
+      e.preventDefault();
+      const f = e.deltaY < 0 ? 1.13 : 1/1.13;
+      const neu = Math.max(.12, Math.min(6, this.zoom*f));
+      this.x = e.offsetX - (e.offsetX-this.x)*(neu/this.zoom);
+      this.y = e.offsetY - (e.offsetY-this.y)*(neu/this.zoom);
+      this.zoom = neu; this.zeichnen();
+    }, {passive:false});
+    el.addEventListener("click", e => { if(!this.gezogen) this.geklickt(e.offsetX,e.offsetY); });
+  }
+  schweben(inhalt, px, py){
+    const s = $("#hirn-schwebe");
+    if(!inhalt){ s.classList.remove("da"); return; }
+    s.innerHTML = inhalt; s.classList.add("da");
+    const r = s.getBoundingClientRect();
+    s.style.left = Math.min(px+15, this.b-r.width-10) + "px";
+    s.style.top  = Math.min(py+15, this.h-r.height-10) + "px";
+  }
+  setzen(d){
+    this.knoten = d.knoten.map(k => ({...k,
+      x:(Math.random()-.5)*620, y:(Math.random()-.5)*620, vx:0, vy:0}));
+    this.kanten = d.kanten;
+    this.nachbarn = new Map();
+    for(const k of this.kanten){
+      if(!this.nachbarn.has(k.von)) this.nachbarn.set(k.von, []);
+      if(!this.nachbarn.has(k.nach)) this.nachbarn.set(k.nach, []);
+      this.nachbarn.get(k.von).push(k.nach);
+      this.nachbarn.get(k.nach).push(k.von);
+    }
+    this.geladen = true;
+    $("#hirn-info").textContent = `${zahl(d.knoten.length)} Notizen · `
+      + `${zahl(d.kanten.length)} Kanten · ${zahl(d.verwaist)} verwaist`;
+    this.rechnen(280); this.passen();
+  }
+  rechnen(schritte){
+    const n = this.knoten;
+    for(let s=0;s<schritte;s++){
+      const kuehl = 1 - s/schritte;
+      for(let i=0;i<n.length;i++) for(let j=i+1;j<n.length;j++){
+        const dx=n[j].x-n[i].x, dy=n[j].y-n[i].y;
+        const d2 = dx*dx+dy*dy || .01;
+        if(d2 > 260000) continue;
+        const kraft = 1900/d2, d = Math.sqrt(d2);
+        const fx=dx/d*kraft, fy=dy/d*kraft;
+        n[i].vx-=fx; n[i].vy-=fy; n[j].vx+=fx; n[j].vy+=fy;
+      }
+      for(const k of this.kanten){
+        const a=n[k.von], b=n[k.nach];
+        const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||.01;
+        const kraft=(d-62)*.012, fx=dx/d*kraft, fy=dy/d*kraft;
+        a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+      }
+      for(const p of n){
+        p.vx -= p.x*.0016; p.vy -= p.y*.0016;
+        p.x += p.vx*kuehl; p.y += p.vy*kuehl;
+        p.vx*=.86; p.vy*=.86;
+      }
+    }
+  }
+  passen(punkte){
+    const p = punkte || this.knoten;
+    if(!p.length || !this.b) return;
+    const xs=p.map(q=>q.x), ys=p.map(q=>q.y);
+    const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+    this.zoom = Math.min((this.b-100)/Math.max(x1-x0,1),
+                         (this.h-110)/Math.max(y1-y0,1), 2.4);
+    this.x = this.b/2 - ((x0+x1)/2)*this.zoom;
+    this.y = this.h/2 - ((y0+y1)/2)*this.zoom;
+    this.zeichnen();
+  }
+  farbe(g,a=1){ let h=0; for(const c of g) h=(h*31+c.charCodeAt(0))%360;
+    return `hsla(${(h*137.5)%360},58%,66%,${a})`; }
+  sichtbar(k){ return !(this.nurVerwaist && k.grad>0); }
+  passt(k){ return !this.suche ||
+    (k.name+" "+k.titel+" "+k.ordner+" "+(k.tags||[]).join(" "))
+      .toLowerCase().includes(this.suche); }
+  radius(k){ return 3.1 + Math.min(Math.sqrt(k.grad)*2.1, 11); }
+  zeichnen(){
+    const c = this.ctx;
+    c.clearRect(0,0,this.b,this.h);
+    c.save(); c.translate(this.x,this.y); c.scale(this.zoom,this.zoom);
+    c.lineWidth = 1/this.zoom;
+    for(const k of this.kanten){
+      const a=this.knoten[k.von], b=this.knoten[k.nach];
+      if(!a || !b) continue;
+      if(!this.sichtbar(a) && !this.sichtbar(b)) continue;
+      const be = this.hervor.has(k.von) || this.hervor.has(k.nach);
+      c.strokeStyle = be ? "rgba(95,211,245,.55)" : "rgba(120,135,165,.16)";
+      c.beginPath(); c.moveTo(a.x,a.y); c.lineTo(b.x,b.y); c.stroke();
+    }
+    // Wichtigste Knoten zuerst beschriften - wer viele Kanten hat, ist die
+    // Orientierung und darf nicht der sein, dessen Name wegfaellt.
+    const belegt = [];
+    const folge = [...this.knoten].sort((a,b) =>
+      (b.grad-a.grad) || (a.name < b.name ? -1 : 1));
+    for(const k of folge){
+      if(!this.sichtbar(k)) continue;
+      const r = this.radius(k), passt = this.passt(k);
+      const be = this.hervor.has(k.id) || this.schwebend===k.id || this.gewaehlt===k.id;
+      c.beginPath(); c.arc(k.x,k.y,r,0,6.2832);
+      c.fillStyle = be ? "#eaf6ff" : passt ? this.farbe(k.gruppe,.92)
+                                           : "rgba(90,101,128,.22)";
+      c.fill();
+      if(be){ c.strokeStyle="rgba(95,211,245,.95)"; c.lineWidth=2/this.zoom;
+              c.beginPath(); c.arc(k.x,k.y,r+3.4,0,6.2832); c.stroke(); }
+      const name = k.name.length>30 ? k.name.slice(0,30)+"…" : k.name;
+      c.font = `${11/this.zoom}px ui-monospace, monospace`; c.textAlign="center";
+      const bb = c.measureText(name).width, hh = 13/this.zoom;
+      let ly = null;
+      for(let v=0; v<4; v++){
+        const yv = k.y + (v%2===0 ? -1 : 1)*(r + 6/this.zoom + Math.floor(v/2)*hh);
+        const kasten = {x0:k.x-bb/2-3, x1:k.x+bb/2+3, y0:yv-hh, y1:yv+3/this.zoom};
+        if(!belegt.some(z => kasten.x0<z.x1 && kasten.x1>z.x0
+                          && kasten.y0<z.y1 && kasten.y1>z.y0)){
+          belegt.push(kasten); ly = yv; break; }
+      }
+      if(ly === null && be) ly = k.y - r - 6/this.zoom;
+      if(ly !== null && (be || passt)){
+        c.fillStyle = be ? "#eaf6ff" : "rgba(215,224,238,.6)";
+        c.fillText(name, k.x, ly);
+      }
+    }
+    c.restore();
+  }
+  treffer(px,py){
+    const w = this.welt(px,py);
+    let best=null, d0=1e9;
+    for(const k of this.knoten){
+      if(!this.sichtbar(k)) continue;
+      const d = Math.hypot(k.x-w.x, k.y-w.y);
+      if(d < this.radius(k)+7/this.zoom && d < d0){ d0=d; best=k; }
+    }
+    return best;
+  }
+  bewegt(px,py){
+    const k = this.treffer(px,py), vorher = this.schwebend;
+    this.schwebend = k ? k.id : null;
+    if(k) this.schweben(
+      `<div class="k">${schuetzen(k.titel)}</div>`
+      + `<div class="u">${schuetzen(k.ordner||"Wurzel")}</div>`
+      + `<dl><dt>Kanten</dt><dd>${k.grad}</dd>`
+      + `<dt>Zeichen</dt><dd>${zahl(k.zeichen)}</dd>`
+      + (k.tags.length ? `<dt>Tags</dt><dd>${schuetzen(k.tags.join(", "))}</dd>`:"")
+      + `</dl>`, px, py);
+    else this.schweben(null);
+    if(vorher !== this.schwebend) this.zeichnen();
+  }
+  geklickt(px,py){
+    const k = this.treffer(px,py);
+    if(!k){ this.gewaehlt=null; this.hervor.clear(); this.zeichnen(); return; }
+    this.gewaehlt = k.id;
+    this.hervor = new Set([k.id, ...(this.nachbarn.get(k.id)||[])]);
+    this.zeichnen();
+    notizOeffnen(k.name);
+  }
+}
+const hirn = new Hirn();
+
+async function hirnLaden(){
+  $("#hirn-info").textContent = "lädt …";
+  try{
+    const d = await hole("/api/graph");
+    if(d.fehler) throw new Error(d.fehler);
+    hirn.setzen(d);
+  }catch(e){ $("#hirn-info").textContent = "Fehler: " + e.message; }
+}
+$("#hirn-suche").addEventListener("input", e => {
+  hirn.suche = e.target.value.trim().toLowerCase(); hirn.zeichnen(); });
+$("#h-verwaist").addEventListener("click", e => {
+  hirn.nurVerwaist = !hirn.nurVerwaist;
+  e.target.classList.toggle("an", hirn.nurVerwaist); hirn.zeichnen(); });
+$("#h-mitte").addEventListener("click", () => hirn.passen());
+$("#h-neu").addEventListener("click", () => hirnLaden());
+
+/* ------------------------------------------------ Notiz-Blende (slide) */
+let offeneNotiz = null;
+async function notizOeffnen(name){
+  $("#einst-blende").classList.remove("auf");
+  $("#notiz-blende").classList.add("auf");
+  $("#n-titel").textContent = name; $("#n-pfad").textContent = "";
+  $("#n-rumpf").textContent = "lädt …";
+  try{
+    const d = await hole("/api/notiz?name=" + encodeURIComponent(name));
+    if(!d.ok){ $("#n-rumpf").textContent = d.meldung || "Nicht gefunden."; return; }
+    offeneNotiz = d;
+    $("#n-titel").textContent = d.titel;
+    $("#n-pfad").textContent = d.pfad;
+    $("#n-rumpf").textContent = d.text || "(leer)";
+    const k = hirn.knoten.find(x => x.name === d.name);
+    if(k){ hirn.gewaehlt = k.id;
+           hirn.hervor = new Set([k.id, ...(hirn.nachbarn.get(k.id)||[])]);
+           hirn.zeichnen(); }
+  }catch(e){ $("#n-rumpf").textContent = "Fehler: " + e.message; }
+}
+$$(".zu").forEach(b => b.addEventListener("click",
+  () => document.getElementById(b.dataset.zu).classList.remove("auf")));
+$("#n-chat").addEventListener("click", () => {
+  if(!offeneNotiz) return;
+  feld.value += (feld.value ? " " : "") + `[[${offeneNotiz.name}]] `;
+  feld.focus(); feld.dispatchEvent(new Event("input"));
+});
+$("#n-nachbarn").addEventListener("click", () => {
+  if(!offeneNotiz) return;
+  const k = hirn.knoten.find(x => x.name === offeneNotiz.name);
+  if(!k) return;
+  hirn.passen([k, ...(hirn.nachbarn.get(k.id)||[]).map(i => hirn.knoten[i])]);
+});
+
+/* ================================================== Einstellungen */
+let einstStart = {}, einstGeladen = false;
+$("#knopf-einst").addEventListener("click", async () => {
+  $("#notiz-blende").classList.remove("auf");
+  const b = $("#einst-blende");
+  b.classList.toggle("auf");
+  if(b.classList.contains("auf") && !einstGeladen) await einstLaden();
+});
+async function einstLaden(){
+  const rumpf = $("#einst-rumpf");
+  try{
+    const d = await hole("/api/einstellungen");
+    einstStart = {};
+    $("#e-pfad").textContent = d.datei || "keine .env gefunden – wird beim Speichern angelegt";
+    let html = "";
+    d.gruppen.forEach((g,i) => {
+      html += `<details class="gruppe" ${i<2?"open":""}><summary>${schuetzen(g.titel)}</summary>`;
+      for(const f of g.felder){
+        einstStart[f.schluessel] = f.wert;
+        html += `<div class="feld"><h4>${schuetzen(f.beschriftung)}`
+          + `<span class="schl">${schuetzen(f.schluessel)}</span>`
+          + (f.neustart ? `<span class="neustart">Neustart</span>` : "")
+          + `</h4>` + (f.erklaerung ? `<p>${schuetzen(f.erklaerung)}</p>` : "")
+          + eingabefeld(f) + `</div>`;
+      }
+      html += `</details>`;
+    });
+    rumpf.innerHTML = html;
+    rumpf.querySelectorAll("[data-schl]").forEach(el =>
+      el.addEventListener("input", einstGeprueft));
+    einstGeladen = true;
+  }catch(e){
+    rumpf.innerHTML = `<div class="meldung schlecht">${schuetzen(e.message)}</div>`;
+  }
+}
+function eingabefeld(f){
+  const s = schuetzen(f.schluessel), w = schuetzen(f.wert);
+  if(f.art === "schalter"){
+    const an = ["true","1","ja","an"].includes(String(f.wert).toLowerCase());
+    return `<label class="schalter"><input type="checkbox" data-schl="${s}" `
+      + `data-art="schalter" ${an?"checked":""}><span class="bahn"></span>`
+      + `<span class="wort">${an?"an":"aus"}</span></label>`;
+  }
+  if(f.art === "auswahl")
+    return `<select data-schl="${s}" data-art="auswahl">`
+      + f.auswahl.map(o => `<option ${o===f.wert?"selected":""}>${schuetzen(o)}</option>`).join("")
+      + `</select>`;
+  return `<input type="${f.art==="zahl"?"number":"text"}" data-schl="${s}" `
+    + `data-art="${f.art}" value="${w}">`;
+}
+const einstWert = (el) => el.dataset.art==="schalter"
+  ? (el.checked ? "true" : "false") : el.value;
+function geaendert(){
+  return $$("#einst-rumpf [data-schl]")
+    .filter(el => einstWert(el) !== einstStart[el.dataset.schl]);
+}
+function einstGeprueft(e){
+  const el = e.target;
+  if(el.dataset.art === "schalter")
+    el.closest(".schalter").querySelector(".wort").textContent = el.checked?"an":"aus";
+  el.classList.toggle("geaendert", einstWert(el) !== einstStart[el.dataset.schl]);
+  const g = geaendert();
+  $("#e-speichern").disabled = !g.length;
+  $("#e-stand").textContent = g.length ? `${g.length} Änderung(en)` : "Keine Änderung.";
+}
+$("#e-speichern").addEventListener("click", async () => {
+  const werte = {};
+  geaendert().forEach(el => werte[el.dataset.schl] = einstWert(el));
+  $("#e-speichern").disabled = true; $("#e-stand").textContent = "speichert …";
+  try{
+    const d = await hole("/api/einstellungen", {werte});
+    const k = document.createElement("div");
+    if(d.ok){
+      k.className = "meldung gut";
+      k.innerHTML = `Gespeichert: ${schuetzen(d.gespeichert.join(", "))}`
+        + (d.neustart_noetig ? `<br><b>Neustart nötig für einige Werte.</b>` : "");
+      Object.assign(einstStart, werte);
+      $$("#einst-rumpf [data-schl]").forEach(el => el.classList.remove("geaendert"));
+      $("#e-stand").textContent = "Keine Änderung.";
+      statusHolen();
+    } else {
+      k.className = "meldung schlecht";
+      k.innerHTML = "Nichts gespeichert:<br>" + d.fehler.map(schuetzen).join("<br>");
+      $("#e-speichern").disabled = false; $("#e-stand").textContent = "nicht gespeichert";
+    }
+    $("#einst-rumpf").prepend(k);
+    setTimeout(() => k.remove(), 9000);
+  }catch(e){
+    $("#e-stand").textContent = "Fehler: " + e.message;
+    $("#e-speichern").disabled = false;
+  }
+});
+
+/* ================================================= Das Protokollfenster
+   Was wirklich passiert ist - Erfolge, Fehler, Dateiänderungen und JEDE
+   Anfrage, die den Rechner verlaesst. Die Eintraege kommen live durch den
+   Chatstrom; beim Oeffnen wird einmal nachgeladen, was vorher war.
+   =================================================================== */
+const EBENEN = [
+  ["alle", "alle"], ["fehler", "Fehler"], ["warnung", "Warnung"],
+  ["erfolg", "Erfolg"], ["aenderung", "Änderung"],
+  ["netz_raus", "→ Netz"], ["netz_rein", "← Netz"], ["info", "Info"],
+];
+const ZEICHEN = {info:"·", erfolg:"✔", warnung:"⚠", fehler:"✖",
+                 aenderung:"✎", netz_raus:"→", netz_rein:"←"};
+
+const log = {
+  offen:false, fest:false, filter:"alle", folgen:true, geladen:false,
+  eintraege:[], letzte:0, zahlen:{},
+};
+
+function logZeigen(an){
+  log.offen = an === undefined ? !log.offen : an;
+  $("#log").classList.toggle("auf", log.offen);
+  document.body.classList.toggle("log-fest", log.fest && log.offen);
+  setTimeout(() => hirn.groesse(), 320);
+  if(!log.offen) return;
+  // Beim Oeffnen IMMER zeichnen. Eintraege, die bei geschlossenem Fenster
+  // ankamen, wurden stumm gesammelt - ohne dieses Neuzeichnen blieb die
+  // Liste leer, obwohl sie voll war.
+  if(!log.geladen){ logLaden(); } else { logMalen(); }
+}
+$("#knopf-log").addEventListener("click", () => logZeigen());
+$("#log-zu").addEventListener("click", () => logZeigen(false));
+$("#log-fest").addEventListener("click", () => {
+  log.fest = !log.fest;
+  $("#log-fest").classList.toggle("an", log.fest);
+  document.body.classList.toggle("log-fest", log.fest && log.offen);
+  setTimeout(() => hirn.groesse(), 320);
+});
+$("#log-folgen").addEventListener("click", () => {
+  log.folgen = !log.folgen;
+  $("#log-folgen").classList.toggle("an", log.folgen);
+});
+$("#log-leeren").addEventListener("click", async () => {
+  try{
+    await hole("/api/protokoll_leeren", {});
+    log.eintraege = []; log.letzte = 0; log.zahlen = {}; logMalen();
+  }catch(e){ /* stumm - das Protokoll darf nichts kaputtmachen */ }
+});
+document.addEventListener("keydown", (e) => {
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l"){
+    e.preventDefault(); logZeigen();
+  }
+});
+
+async function logLaden(){
+  try{
+    // ab=0: Der Server hat mehr als die Live-Ereignisse dieser Sitzung.
+    // Doppelte fallen ueber die laufende Nummer heraus.
+    const d = await hole("/api/protokoll?anzahl=400");
+    const bekannt = new Set(log.eintraege.map(e => e.nummer));
+    for(const e of (d.eintraege || []))
+      if(!bekannt.has(e.nummer)) log.eintraege.push(e);
+    log.eintraege.sort((a, b) => (a.nummer || 0) - (b.nummer || 0));
+    log.letzte = Math.max(log.letzte, ...log.eintraege.map(e => e.nummer || 0), 0);
+    log.zahlen = d.zahlen || {};
+    $("#log-pfad").textContent = d.datei || "(keine Datei)";
+    $("#log-pfad").title = d.datei || "";
+    log.geladen = true;
+    logMalen();
+  }catch(e){
+    $("#log-pfad").textContent = "Protokoll nicht erreichbar: " + e.message;
+  }
+}
+function logDazu(eintrag, stumm){
+  if(!eintrag) return;
+  if(eintrag.nummer && eintrag.nummer <= log.letzte) return;
+  log.letzte = Math.max(log.letzte, eintrag.nummer || 0);
+  log.eintraege.push(eintrag);
+  if(log.eintraege.length > 1200) log.eintraege.splice(0, 300);
+  log.zahlen[eintrag.ebene] = (log.zahlen[eintrag.ebene] || 0) + 1;
+  log.zahlen.gesamt = (log.zahlen.gesamt || 0) + 1;
+  if(!stumm) logMalen();
+}
+function logFilterMalen(){
+  $("#log-filter").innerHTML = EBENEN.map(([k, text]) => {
+    const n = k === "alle" ? (log.zahlen.gesamt || 0) : (log.zahlen[k] || 0);
+    return `<button data-e="${k}" class="${log.filter===k?"an":""}">`
+      + `${schuetzen(text)}<span class="n">${n}</span></button>`;
+  }).join("");
+  $$("#log-filter button").forEach(b => b.addEventListener("click", () => {
+    log.filter = b.dataset.e; logMalen();
+  }));
+}
+function logMalen(){
+  logFilterMalen();
+  const sicht = log.filter === "alle"
+    ? log.eintraege : log.eintraege.filter(e => e.ebene === log.filter);
+  $("#log-zahl").textContent = `${sicht.length} von ${log.eintraege.length}`;
+  $("#log-zeilen").innerHTML = sicht.slice(-500).map(e => {
+    const uhr = new Date((e.zeit || 0) * 1000)
+      .toLocaleTimeString("de-DE", {hour12:false});
+    let rest = "";
+    try{
+      const teile = Object.entries(e.daten || {})
+        .filter(([, v]) => v !== "" && v !== null && v !== undefined)
+        .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`);
+      if(teile.length) rest = `<span class="d">${schuetzen(teile.join("  "))}</span>`;
+    }catch(x){}
+    return `<div class="lz ${schuetzen(e.ebene)}">`
+      + `<span class="t">${uhr}</span>`
+      + `<span class="z">${ZEICHEN[e.ebene] || "·"}</span>`
+      + (e.quelle ? `<span class="q">${schuetzen(e.quelle)}</span>` : "")
+      + `<span class="m">${schuetzen(e.text)} ${rest}</span></div>`;
+  }).join("") || `<div style="padding:10px;color:var(--text-schwach)">Nichts protokolliert.</div>`;
+  if(log.folgen){
+    const z = $("#log-zeilen"); z.scrollTop = z.scrollHeight;
+  }
+}
+logFilterMalen();
+
+/* ========================================================== Zustand */
+async function statusHolen(){
+  try{
+    const d = await hole("/api/status");
+    Object.assign(ZUSTAND, d);
+    $("#name").textContent = (d.name || "ZEUS").toUpperCase();
+    $("#chip-modell").textContent = d.modell || "–";
+    $("#chip-host").textContent = String(d.host).replace(/^https?:\/\//,"");
+    $("#chip-host").className = "chip" + (d.auf_ausweich ? " warn" : "");
+    $("#chip-host").title = d.auf_ausweich ? "Ausweichserver!" : d.host;
+    const t = String(d.vault).split(/[\\/]/);
+    $("#chip-vault").textContent = t[t.length-1] || d.vault;
+    $("#chip-vault").title = d.vault;
+    $("#chip-trocken").style.display = d.trockenlauf ? "" : "none";
+  }catch(e){ $("#chip-host").textContent = "kein Server"; }
+}
+
+/* ============================================================ Start */
+(function start(){
+  zeile("ZEUS", "sys").innerHTML = markdown(
+    "Board bereit. Links das Gespräch, rechts das Gehirn.\n\n"
+    + "- `/` am Zeilenanfang → **Befehlsliste** mit Argumenten (`/hilfe` zeigt alles)\n"
+    + "- `[` beim Tippen → **Werkzeuge und Fertigkeiten**, die Auswahl schließt mit `]`\n"
+    + "- Der Streifen oben klappt alle Werkzeuge als Reihe auf – Mausrad scrollt seitwärts\n"
+    + "- Klick auf einen Knoten rechts öffnet die Notiz");
+  statusHolen(); setInterval(statusHolen, 30000);
+  hirn.groesse(); hirnLaden();
+  feld.focus();
+})();
+</script>
+</body>
+</html>

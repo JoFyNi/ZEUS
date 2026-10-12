@@ -1,0 +1,54 @@
+Analysiere deinen eigenen Zustand und schlage Verbesserungen vor.
+
+SCHRITT 1 - GENAU EIN WERKZEUGAUFRUF, dann keiner mehr:
+notiz_lesen(name="_System/Code/Pruefungen/Code-Prüfung_HEUTE.md")
+Ersetze HEUTE durch das heutige Datum im Format JJJJ-MM-TT.
+Gib den PFAD an, nicht nur den Titel - sonst landest du bei einer
+thematisch ähnlichen Notiz statt beim Bericht.
+Findest du die Datei nicht, sage das und hör auf. Rate nicht.
+Danach antwortest du. Weitere Werkzeugaufrufe sind verboten.
+
+VERBOTEN - das sind die Fehler, die du bisher gemacht hast:
+- Keine Dateiliste. Wie viele Zeilen agent.py hat, interessiert niemanden.
+- Kein Vorlesen oder Nacherzählen von Code.
+- Keine Aufzählung dessen, was du schon kannst.
+- Kein Vorschlag ohne Prüfkriterium.
+- Nichts erfinden. Nur was im Bericht steht oder was du selbst erlebt hast.
+- Behaupte nicht, etwas geändert zu haben. Du kannst deinen Code NICHT ändern -
+  du schlägst vor, Josh setzt um.
+
+WORAUF ES ANKOMMT - in dieser Rangfolge:
+1. Stellen, an denen du Erfolg meldest, ohne dass etwas geschehen ist.
+2. Stellen, an denen dir ein Werkzeug fehlt und du deshalb improvisierst.
+3. Stellen, an denen du dieselbe Sache mehrfach vergeblich versuchst.
+4. Fähigkeiten, die dich unabhängiger machen: Was müsstest du können, um eine
+   Aufgabe ohne Rückfrage zu Ende zu bringen, die du heute abbrichst?
+Schönerer Code, bessere Namen und Formatierung sind KEIN Vorschlag.
+
+FORMAT - exakt so, nichts davor, nichts danach:
+
+LAGE
+Drei Sätze: Was sagt der Bericht über deinen Zustand? Nur Belegtes.
+
+VORSCHLAG <Nr>
+Titel:
+Betrifft: <Datei und Zeile ODER "neues Werkzeug: name">
+Problem: (1 Satz - woher weißt du das? Bericht, Fehlermeldung, eigener Fehlversuch)
+Beleg: (Zitat aus dem Bericht oder die wörtliche Fehlermeldung)
+Änderung: (2-3 Sätze, konkret genug zum Umsetzen)
+Prüfung: (Woran erkennt Josh, dass es wirkt? Ein Testfall oder eine Prüfaufgabe
+          im Format: frage / pruefung)
+Macht mich selbstständiger: ja, weil … | nein
+Aufwand: klein | mittel | groß
+Zuversicht: sicher | wahrscheinlich | Vermutung
+
+RANGFOLGE
+Die Nummern in der Reihenfolge, in der du sie umsetzen würdest, je ein Satz warum.
+
+NICHT BEURTEILBAR
+Was du nicht einschätzen konntest und warum.
+
+REGELN
+- Höchstens 5 Vorschläge. Fünf belegte sind mehr wert als zwanzig gedachte.
+- Jeder Vorschlag braucht Beleg UND Prüfung. Ohne beides: weglassen.
+- Steht im Bericht nichts Verwertbares, sage das und schlage nichts vor.

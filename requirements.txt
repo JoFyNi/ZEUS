@@ -1,0 +1,36 @@
+# --- Kern (nötig) ---
+requests>=2.31
+python-dotenv>=1.0
+PyYAML>=6.0
+langchain-core>=0.2
+langchain-community>=0.2
+langchain-text-splitters>=0.2
+faiss-cpu>=1.8
+
+# pypdf holt Text aus PDFs heraus (datei_importieren). Mindestens 5.0:
+# aeltere Fassungen brechen bei einer beschaedigten xref-Tabelle ab, statt
+# sie zu rekonstruieren - und genau solche PDFs liefern Scanner und
+# Folienexporte am laufenden Band.
+pypdf>=5.0
+
+# --- Oberfläche ---
+rich>=13.7
+# pywebview gibt der grafischen Oberflaeche ein eigenes Fenster statt eines
+# Browser-Tabs. Es bringt KEINEN eigenen Browser mit, sondern nutzt den, der
+# auf dem Rechner ohnehin liegt (Windows: das mitgelieferte WebView2).
+# Fehlt das Paket, oeffnet 'python jarvis_run.py --ui' einfach den Browser -
+# dieselbe Oberflaeche, nur mit Adresszeile.
+pywebview>=5.0
+
+# --- Sprachausgabe (optional) ---
+# pyttsx3 nutzt die Systemstimmen (Windows: Microsoft David/Zira) - immer da,
+# klingt aber blechern. Rueckfallebene, bleibt bewusst drin.
+pyttsx3>=2.90
+# piper: lokales neuronales TTS, deutlich natuerlicher. Kein Konto, keine Cloud.
+# Einrichten mit:  python jarvis_run.py --stimme-einrichten en_GB-alan-medium
+piper-tts>=1.3
+
+# --- Spracheingabe (optional) ---
+faster-whisper>=1.0
+sounddevice>=0.4
+numpy>=1.24
