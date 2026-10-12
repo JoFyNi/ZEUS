@@ -1,4 +1,4 @@
-# JARVIS – strukturbewusster Second Brain für Obsidian
+# ZEUS – strukturbewusster Second Brain für Obsidian
 
 Weiterentwicklung deines RAG-Skripts. Zwei Probleme waren zu lösen:
 
