@@ -1,0 +1,107 @@
+# ZEUS – KI-Modelle und Sprachdateien: Lizenzübersicht
+
+Diese Datei dokumentiert die externen KI-Modelle und Sprachdateien, die ZEUS verwendet oder unterstützen kann.
+
+ZEUS selbst ist unter der GNU General Public License v3.0 only (GPL-3.0-only) lizenziert. Die Lizenz von ZEUS gilt nicht automatisch für externe Modelle, Modellgewichte oder Sprachdateien.
+
+Die Modelle und Stimmen werden nicht standardmäßig zusammen mit dem ZEUS-Quellcode verteilt. Nutzer laden sie separat herunter und müssen die jeweils geltenden Lizenzbedingungen beachten.
+
+**Letzte Aktualisierung:** 2026-10-12
+
+## 1. Ollama – Laufzeitumgebung
+
+**Software:** Ollama  
+**Offizielle Website:** https://ollama.com/  
+**Modellbibliothek:** https://ollama.com/library
+
+Ollama dient zum lokalen Ausführen der nachfolgend aufgeführten Modelle.
+
+Die Lizenzbedingungen der Ollama-Software und die Lizenzbedingungen der einzelnen Modelle sind getrennt zu prüfen.
+
+## 2. Primäres Sprachmodell: Qwen3.8 27B
+
+- **Konfigurationsvariable:** `LLM_MODEL`
+- **Modellkennung:** `qwen3.8:27b`
+- **Anbieter:** Qwen
+- **Quelle:** https://ollama.com/library/qwen3.8
+- **Offizielles Projekt:** https://github.com/QwenLM/Qwen3.8
+- **Lizenz der konkreten Modellgewichte:** Vor Veröffentlichung anhand der zum Modell gehörenden Lizenzdatei prüfen.
+- **Kommerzielle Nutzung:** Vor Verwendung in kommerziellen Anwendungen anhand der konkreten Modelllizenz und gegebenenfalls zusätzlicher Nutzungsbedingungen prüfen.
+- **Weitergabe der Modellgewichte:** Vor einer Weitergabe die konkrete Lizenz und deren Bedingungen prüfen.
+- **Status:** Lizenzprüfung der konkreten Modellgewichte ausstehend.
+
+Hinweis: Die Lizenz des Qwen3.8-Projektrepositories darf nicht ungeprüft mit der Lizenz der heruntergeladenen Modellgewichte gleichgesetzt werden. Maßgeblich ist die Lizenz, die für die konkret verwendeten Gewichte gilt.
+
+## 3. Alternatives Sprachmodell: Qwen2.5 14B
+
+- **Konfigurationsvariable:** `LLM_MODEL_ALTERNATIVE`
+- **Modellkennung:** `qwen2.5:14b`
+- **Anbieter:** Qwen
+- **Quelle:** https://ollama.com/library/qwen2.5
+- **Offizielles Projekt:** https://github.com/QwenLM/Qwen2.5
+- **Lizenz:** Apache License 2.0 für die entsprechende Qwen2.5-Modellversion; die Lizenzdatei der konkret verwendeten Gewichte ist zu kontrollieren.
+- **Kommerzielle Nutzung:** Nach Maßgabe der Apache License 2.0 grundsätzlich erlaubt, sofern die konkreten Modellgewichte dieser Lizenz unterliegen und die Lizenzbedingungen eingehalten werden.
+- **Weitergabe der Modellgewichte:** Nach Maßgabe der Apache License 2.0 grundsätzlich erlaubt, sofern die konkreten Modellgewichte dieser Lizenz unterliegen und die erforderlichen Lizenz- und Hinweisdateien mitgegeben werden.
+- **Status:** Konkrete Modellversion und Lizenzdatei vor einer Weiterverteilung kontrollieren.
+
+## 4. Embedding-Modell: BGE-M3
+
+- **Konfigurationsvariable:** `EMBEDDING_MODEL`
+- **Modellkennung:** `bge-m3`
+- **Anbieter:** Beijing Academy of Artificial Intelligence (BAAI)
+- **Quelle:** https://ollama.com/library/bge-m3
+- **Offizielle Modellkarte:** https://huggingface.co/BAAI/bge-m3
+- **Lizenz:** MIT License laut offizieller Modellkarte.
+- **Kommerzielle Nutzung:** Grundsätzlich erlaubt, unter Einhaltung der MIT-Lizenzbedingungen.
+- **Weitergabe der Modellgewichte:** Grundsätzlich erlaubt, unter Einhaltung der MIT-Lizenzbedingungen und der erforderlichen Copyright- und Lizenzhinweise.
+- **Status:** Lizenzangabe anhand der offiziellen Modellkarte dokumentiert; bei abweichenden Modellvarianten erneut prüfen.
+
+## 5. Sprachverarbeitung: faster-whisper und Whisper-Modellgewichte
+
+ZEUS kann faster-whisper zur Spracherkennung verwenden.
+
+- **Bibliothek:** faster-whisper
+- **Projekt:** https://github.com/SYSTRAN/faster-whisper
+- **Whisper-Projekt:** https://github.com/openai/whisper
+- **Lizenz der Bibliothek:** Separat anhand der konkret installierten Version prüfen.
+- **Modellgewichte:** Die Lizenz und Nutzungsbedingungen der tatsächlich heruntergeladenen Modellgewichte separat prüfen.
+- **Kommerzielle Nutzung:** Nicht pauschal für jede mögliche Modellvariante bestätigen.
+- **Weitergabe:** Vor einer Weitergabe die konkreten Lizenzbedingungen prüfen.
+- **Status:** Das tatsächlich verwendete Whisper-Modell und seine genaue Version müssen noch dokumentiert werden.
+
+## 6. Text-to-Speech: Piper
+
+ZEUS verwendet Piper als Text-to-Speech-Engine.
+
+- **Konfigurationsvariable:** `TTS_ENGINE=piper`
+- **Projekt:** https://github.com/OHF-Voice/piper1-gpl
+- **Lizenz der Software:** Anhand der konkreten installierten Version und ihrer Lizenzdatei prüfen.
+- **Verwendete Stimme:** Noch nicht angegeben.
+- **Quelle der Stimme:** Für die konkret verwendete Stimme ergänzen.
+- **Lizenz der Stimme:** Anhand der jeweiligen MODEL_CARD und der zugehörigen Lizenzbedingungen prüfen.
+- **Kommerzielle Nutzung:** Erst nach Prüfung der konkreten Stimme bestätigen.
+- **Weitergabe der Stimmdateien:** Erst nach Prüfung der konkreten Stimme bestätigen.
+- **Status:** Die genaue Stimme und ihre Lizenz müssen noch ergänzt werden.
+
+Wichtig: Die Lizenz der Piper-Software ist nicht automatisch die Lizenz der einzelnen Sprachmodelle. Einige Stimmen können zusätzliche Einschränkungen enthalten.
+
+Offizielle Stimmenübersicht: https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/VOICES.md
+
+## 7. Allgemeine Hinweise
+
+1. Die GPL-3.0-Lizenz von ZEUS ersetzt nicht die Lizenzen externer Modelle oder Sprachdateien.
+2. Die Lizenz einer Python-Bibliothek gilt nicht automatisch für separat heruntergeladene Modellgewichte.
+3. Kostenloser Download bedeutet nicht automatisch, dass kommerzielle Nutzung oder Weitergabe erlaubt ist.
+4. Vor der Weitergabe von Modellen, Stimmen oder Installationspaketen müssen alle relevanten Lizenzbedingungen geprüft werden.
+5. Bei einem Modellwechsel oder einer Aktualisierung sind die Lizenzangaben erneut zu kontrollieren.
+6. Nicht abschließend geprüfte Angaben müssen als offen gekennzeichnet bleiben.
+
+## 8. Offene Prüfungen
+
+- [ ] Lizenzdatei der konkreten Qwen3.8-27B-Gewichte prüfen.
+- [ ] Konkrete Qwen2.5-14B-Modellversion und Lizenzdatei prüfen.
+- [ ] Lizenzhinweise der verwendeten BGE-M3-Variante dokumentieren.
+- [ ] Tatsächlich verwendetes Whisper-Modell und seine Lizenz dokumentieren.
+- [ ] Konkrete Piper-Stimme, Quelle und Lizenz eintragen.
+- [ ] Lizenzen der Python-Abhängigkeiten in `THIRD_PARTY_NOTICES.md` dokumentieren.
+- [ ] Bei Änderungen die Übersicht aktualisieren.
